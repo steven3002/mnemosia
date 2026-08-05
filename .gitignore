@@ -10,7 +10,7 @@
 node_modules/
 vendor/
 
-# Environment / secrets — never commit
+# Environment / secrets, never commit
 .env
 .env.*
 *.key
