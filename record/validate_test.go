@@ -1,6 +1,7 @@
 package record_test
 
 import (
+	"errors"
 	"strings"
 	"testing"
 
@@ -61,6 +62,21 @@ func TestValidateRejectsAnEmptyStatement(t *testing.T) {
 	memory.Statement = "   "
 	if err := memory.Validate(); err == nil {
 		t.Fatal("a blank statement was accepted")
+	}
+}
+
+// Context is rejected at validation rather than defaulted. It is the single
+// largest measured contributor to recall quality, and a record is immutable once
+// written, so a missing context is unrepairable after the fact.
+func TestValidateRejectsAMissingContext(t *testing.T) {
+	for _, context := range []string{"", "   ", "\n\t "} {
+		memory := valid(t)
+		memory.Context = context
+		if err := memory.Validate(); err == nil {
+			t.Fatalf("a memory with context %q was accepted", context)
+		} else if !errors.Is(err, record.ErrInvalid) {
+			t.Fatalf("context %q rejected with %v, want an ErrInvalid", context, err)
+		}
 	}
 }
 

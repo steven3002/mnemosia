@@ -34,7 +34,9 @@ func TestBodyRoundTrip(t *testing.T) {
 	}
 }
 
-func TestVectorRoundTrip(t *testing.T) {
+// Ranking metadata is read before anything is fetched, so it has to survive
+// this device dropping its copy of the record body.
+func TestRankingMetadataOutlivesTheBody(t *testing.T) {
 	store, err := local.Open(filepath.Join(t.TempDir(), "vault.db"))
 	if err != nil {
 		t.Fatalf("open: %v", err)
@@ -45,21 +47,62 @@ func TestVectorRoundTrip(t *testing.T) {
 	if err := store.PutBody(id, record.KindMemory, []byte("{}")); err != nil {
 		t.Fatalf("put body: %v", err)
 	}
-	want := []float32{0.5, -0.25, 0.125}
-	if err := store.PutVector(id, "test-model", want); err != nil {
-		t.Fatalf("put vector: %v", err)
+	if err := store.PutRankingMeta(local.RankingMeta{
+		ID: id, Type: record.TypeFact, Tags: []string{"Sia", " storage ", "sia"},
+	}); err != nil {
+		t.Fatalf("put ranking metadata: %v", err)
 	}
 
-	stored, err := store.Vectors()
+	// Dropping the local body is how the lower read tiers are reached; the
+	// record is still on the network and still has to rank.
+	if err := store.ForgetBody(id); err != nil {
+		t.Fatalf("forget body: %v", err)
+	}
+
+	meta, err := store.RankingMetaFor(id)
 	if err != nil {
-		t.Fatalf("read vectors: %v", err)
+		t.Fatalf("read ranking metadata after forgetting the body: %v", err)
 	}
-	if len(stored) != 1 || stored[0].ID != id || stored[0].Model != "test-model" {
-		t.Fatalf("stored vectors are %+v", stored)
+	if meta.Type != record.TypeFact {
+		t.Fatalf("type came back as %q", meta.Type)
 	}
-	for n, v := range want {
-		if stored[0].Values[n] != v {
-			t.Fatalf("dimension %d came back as %v, want %v", n, stored[0].Values[n], v)
+	if len(meta.Tags) != 2 || meta.Tags[0] != "sia" || meta.Tags[1] != "storage" {
+		t.Fatalf("tags came back as %v, want them normalised and deduplicated", meta.Tags)
+	}
+}
+
+// Tag frequency is what makes a tag's specificity visible at write time.
+func TestTagFrequenciesCountRecords(t *testing.T) {
+	store, err := local.Open(filepath.Join(t.TempDir(), "vault.db"))
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	defer store.Close()
+
+	for i := range 5 {
+		id, _ := record.NewID()
+		tags := []string{"sia"}
+		if i == 0 {
+			tags = append(tags, "slab-quantum")
+		}
+		if err := store.PutRankingMeta(local.RankingMeta{
+			ID: id, Type: record.TypeFact, Tags: tags,
+		}); err != nil {
+			t.Fatalf("put ranking metadata: %v", err)
+		}
+	}
+
+	counts, total, err := store.TagFrequencies([]string{"sia", "slab-quantum", "never-used"})
+	if err != nil {
+		t.Fatalf("tag frequencies: %v", err)
+	}
+	if total != 5 {
+		t.Fatalf("counted %d records, want 5", total)
+	}
+	want := map[string]int{"sia": 5, "slab-quantum": 1, "never-used": 0}
+	for _, count := range counts {
+		if want[count.Tag] != count.Records {
+			t.Fatalf("tag %q counted %d records, want %d", count.Tag, count.Records, want[count.Tag])
 		}
 	}
 }

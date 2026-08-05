@@ -2,6 +2,7 @@
 package index
 
 import (
+	"errors"
 	"fmt"
 	"sync"
 
@@ -41,8 +42,23 @@ func (i *Index) Len() int {
 	return len(i.ids)
 }
 
+// ErrForeignModel reports a vector produced by a model other than this index's.
+//
+// Two models embed into different spaces, so the cosine between their vectors is
+// a number with no meaning — and, being a number, it ranks perfectly happily.
+// That is the failure this guards: not a crash, but a silently wrong order.
+var ErrForeignModel = errors.New("vector was produced by a different embedding model")
+
 // Add stores a vector, replacing any vector already held for the record.
-func (i *Index) Add(id record.ID, vector []float32) error {
+//
+// The model is a required argument rather than something the caller is trusted
+// to have checked. Every path that puts a vector into an index has to name the
+// model that produced it, and an index accepts exactly one, so mixing two is not
+// something a caller can do by forgetting.
+func (i *Index) Add(id record.ID, model string, vector []float32) error {
+	if model != i.model {
+		return fmt.Errorf("%w: index holds %q, got %q for %s", ErrForeignModel, i.model, model, id)
+	}
 	if len(vector) != i.dim {
 		return fmt.Errorf("index holds %d-dimension vectors, got %d for %s", i.dim, len(vector), id)
 	}
@@ -56,18 +72,6 @@ func (i *Index) Add(id record.ID, vector []float32) error {
 	i.at[id] = len(i.ids)
 	i.ids = append(i.ids, id)
 	i.vectors = append(i.vectors, vector...)
-	return nil
-}
-
-// Hydrate loads many vectors at once, which is how the index comes back after a
-// process restart. Vectors are persisted by the device's store; this package
-// holds no durability of its own.
-func (i *Index) Hydrate(ids []record.ID, vectors [][]float32) error {
-	for n, id := range ids {
-		if err := i.Add(id, vectors[n]); err != nil {
-			return err
-		}
-	}
 	return nil
 }
 

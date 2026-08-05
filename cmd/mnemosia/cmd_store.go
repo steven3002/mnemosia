@@ -79,6 +79,23 @@ func runStatus(ctx context.Context, args []string) error {
 		humanBytes(uint64(stats.SnapshotBytes)), humanBytes(uint64(stats.LogBytes)),
 		stats.Compactions, humanBytes(uint64(stats.Written)))
 
+	health := v.IndexHealth()
+	vectors := v.VectorStats()
+	fmt.Fprintf(stderr, "index     %d vector(s) of %s, %s base + %s delta, %d compaction(s)\n",
+		health.Indexed, health.Model,
+		humanBytes(uint64(vectors.BaseBytes)), humanBytes(uint64(vectors.DeltaBytes)), vectors.Compactions)
+	// A mixed index is reported rather than passed over. Vectors from two models
+	// cannot be compared, so the ones from the other model are simply not
+	// searched — which looks exactly like the vault having become worse at
+	// recall unless it is said out loud.
+	if health.Mixed() {
+		fmt.Fprintf(stderr, "  ⚠ %d vector(s) are from another model and are NOT searchable:\n", health.Stale())
+		for model, count := range health.Foreign {
+			fmt.Fprintf(stderr, "      %-32s %d\n", model, count)
+		}
+		fmt.Fprintln(stderr, "      re-embed those records to make them findable again")
+	}
+
 	if cache, err := v.CacheSize(); err == nil && cache.Objects > 0 {
 		fmt.Fprintf(stderr, "locations %s for %d object(s) over %d slab(s), %.0f B/object\n",
 			humanBytes(uint64(cache.Total())), cache.Objects, cache.Slabs, cache.PerObject())

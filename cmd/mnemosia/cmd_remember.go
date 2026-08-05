@@ -17,7 +17,8 @@ func runRemember(ctx context.Context, args []string) error {
 	context_ := fs.String("context", "", "what makes the statement resolvable on its own")
 	memType := fs.String("type", string(record.TypeFact),
 		"one of "+strings.Join(record.TypeNames(), ", "))
-	tags := fs.String("tags", "", "comma-separated tags")
+	tags := fs.String("tags", "", "comma-separated tags; prefer specific ones, and reuse the vault's existing vocabulary")
+	supersedes := fs.String("supersedes", "", "the id of a record this one replaces")
 	flush := fs.Bool("flush", true, "write to Sia before returning instead of leaving the record queued")
 	if err := fs.Parse(args); err != nil {
 		return err
@@ -33,13 +34,22 @@ func runRemember(ctx context.Context, args []string) error {
 	}
 	defer v.Close()
 
-	result, err := v.Remember(ctx, vault.RememberRequest{
+	req := vault.RememberRequest{
 		Statement: statement,
 		Context:   *context_,
 		Type:      record.Type(*memType),
 		Tags:      splitTags(*tags),
 		Source:    record.Source{Origin: "cli", Client: "mnemosia"},
-	})
+	}
+	if *supersedes != "" {
+		replaced, err := record.ParseID(*supersedes)
+		if err != nil {
+			return err
+		}
+		req.Supersedes = &replaced
+	}
+
+	result, err := v.Remember(ctx, req)
 	if err != nil {
 		return err
 	}
@@ -57,6 +67,7 @@ func runRemember(ctx context.Context, args []string) error {
 
 	fmt.Println(result.ID)
 	fmt.Fprintf(stderr, "  cid       %s\n", result.CID)
+	reportAdvice(result)
 	fmt.Fprintf(stderr, "  embed     %s\n", took(result.EmbedFor))
 	fmt.Fprintf(stderr, "  seal      %s\n", took(result.SealFor))
 	if result.OnNetwork && result.Flushed != nil {
@@ -80,6 +91,48 @@ func splitTags(raw string) []string {
 		if tag = strings.TrimSpace(tag); tag != "" {
 			out = append(out, tag)
 		}
+	}
+	return out
+}
+
+// reportAdvice prints what the vault noticed about the record just written.
+//
+// It is on stderr with the rest of the diagnostics because it is advice, not
+// output: the caller decides whether a near-duplicate is a duplicate, and
+// whether a tag is worth narrowing. The vault runs no model and does not decide
+// either.
+func reportAdvice(result vault.RememberResult) {
+	for _, tag := range result.Tags.Tags {
+		switch {
+		case tag.New:
+			fmt.Fprintf(stderr, "  tag       %-20s new to this vault\n", tag.Tag)
+		case tag.TooCommon:
+			fmt.Fprintf(stderr, "  tag       %-20s on %d of %d records (%.0f%%) — too common to narrow a search\n",
+				tag.Tag, tag.Records, result.Tags.Records, 100*tag.Share)
+		default:
+			fmt.Fprintf(stderr, "  tag       %-20s on %d of %d records\n",
+				tag.Tag, tag.Records, result.Tags.Records)
+		}
+	}
+	if result.Tags.NeedsNarrowerTags() {
+		fmt.Fprintln(stderr, "  ⚠ none of these tags narrows a search of this vault; a more specific one would")
+	}
+	for _, conflict := range result.Conflicts {
+		fmt.Fprintf(stderr, "  ⚠ near-duplicate [%.4f] %s\n", conflict.Similarity, conflict.ID)
+		if conflict.Statement != "" {
+			fmt.Fprintf(stderr, "              %s\n", conflict.Statement)
+		}
+	}
+	if len(result.Conflicts) > 0 {
+		fmt.Fprintln(stderr, "  decide whether this adds to the vault or replaces the record above (-supersedes)")
+	}
+}
+
+// splitTypes parses a comma-separated type list for the recall filter.
+func splitTypes(raw string) []record.Type {
+	var out []record.Type
+	for _, name := range splitTags(raw) {
+		out = append(out, record.Type(name))
 	}
 	return out
 }

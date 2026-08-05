@@ -37,6 +37,8 @@ type Vault struct {
 	store     *store.Store
 	packer    *packer.Packer
 	reclaimer *reclaim.Reclaimer
+	vectors   *index.Store
+	health    IndexHealth
 }
 
 // Open prepares a vault for use.
@@ -152,22 +154,80 @@ func (v *Vault) openIndex(ctx context.Context) error {
 	v.embedder = embedder
 	v.index = index.New(v.opts.Model.Name, embedder.Dim())
 
-	stored, err := v.local.Vectors()
+	vectors, err := index.OpenStore(v.opts.indexDir(), v.sealer)
 	if err != nil {
 		return err
 	}
-	for _, vector := range stored {
-		// A vector from another model belongs to a different space; scoring it
-		// against this query would be meaningless rather than merely worse.
-		if vector.Model != v.opts.Model.Name {
-			continue
-		}
-		if err := v.index.Add(vector.ID, vector.Values); err != nil {
+	v.vectors = vectors
+
+	stored, err := vectors.Hydrate()
+	if err != nil {
+		return err
+	}
+	usable, health := classifyVectors(v.opts.Model.Name, embedder.Dim(), stored)
+	for _, vector := range usable {
+		if err := v.index.Add(vector.ID, vector.Model, vector.Vector); err != nil {
 			return err
 		}
 	}
+	v.health = health
 	return nil
 }
+
+// classifyVectors separates the vectors this index can search from the ones it
+// cannot, and counts what it left behind.
+//
+// A vector from another model belongs to a different space, so scoring it
+// against this query would be meaningless rather than merely worse. It is
+// counted rather than passed over in silence: a vault that quietly searches a
+// tenth of itself looks exactly like a vault with poor recall, and the two want
+// completely different responses.
+func classifyVectors(model string, dim int, stored []index.Entry) ([]index.Entry, IndexHealth) {
+	health := IndexHealth{Model: model, Dim: dim, Foreign: map[string]int{}}
+	usable := make([]index.Entry, 0, len(stored))
+	for _, vector := range stored {
+		if vector.Model != model || vector.Dim != dim {
+			health.Foreign[vector.Model]++
+			continue
+		}
+		usable = append(usable, vector)
+		health.Indexed++
+	}
+	return usable, health
+}
+
+// An IndexHealth reports what the index was built from.
+//
+// It exists because the interesting failure here is silent. Vectors from two
+// models cannot be compared, but comparing them produces a number rather than an
+// error, so an index that has been half re-embedded ranks confidently and
+// wrongly. Counting what was left out is what turns that into something a user
+// can be told.
+type IndexHealth struct {
+	// Model and Dim are what this index accepts.
+	Model string
+	Dim   int
+	// Indexed is how many vectors are searchable.
+	Indexed int
+	// Foreign counts stored vectors held under some other model, by model name.
+	Foreign map[string]int
+}
+
+// Mixed reports whether the device holds vectors this index cannot search.
+func (h IndexHealth) Mixed() bool { return len(h.Foreign) > 0 }
+
+// Stale reports how many records are on the device but absent from the index.
+func (h IndexHealth) Stale() int {
+	var n int
+	for _, count := range h.Foreign {
+		n += count
+	}
+	return n
+}
+
+// IndexHealth reports what the search index was built from, including any
+// vectors it had to leave out.
+func (v *Vault) IndexHealth() IndexHealth { return v.health }
 
 func (v *Vault) connect(ctx context.Context) error {
 	client, err := sia.Connect(sia.Config{Indexer: v.opts.Indexer, AppKey: v.opts.AppKey})
@@ -232,6 +292,9 @@ func (v *Vault) Close() error {
 	if v.manifest != nil {
 		errs = append(errs, v.manifest.Close())
 	}
+	if v.vectors != nil {
+		errs = append(errs, v.vectors.Close())
+	}
 	if v.embedder != nil {
 		errs = append(errs, v.embedder.Close())
 	}
@@ -295,7 +358,7 @@ func (v *Vault) PendingBytes() int64 {
 
 // Recall retrieves records by meaning.
 func (v *Vault) Recall(ctx context.Context, req recall.Request) (recall.Result, error) {
-	return recall.New(v.embedder, v.index, v).Run(ctx, req)
+	return recall.New(v.embedder, v.index, v, v).Run(ctx, req)
 }
 
 var errOffline = errors.New("vault is open offline")

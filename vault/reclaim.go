@@ -183,7 +183,10 @@ func (v *Vault) Forget(id record.ID) error {
 	if err := v.local.ForgetBody(id); err != nil {
 		return err
 	}
-	return v.local.ForgetVector(id)
+	if err := v.vectors.Remove(id); err != nil {
+		return err
+	}
+	return v.local.ForgetRankingMeta(id)
 }
 
 // Entries lists the catalog, so a caller can see what the vault believes it

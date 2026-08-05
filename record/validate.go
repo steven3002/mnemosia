@@ -40,6 +40,16 @@ func (m *Memory) Validate() error {
 	if len(m.Statement) > MaxStatementBytes {
 		return fmt.Errorf("%w: statement is %d bytes, limit %d", ErrInvalid, len(m.Statement), MaxStatementBytes)
 	}
+	// Context is required, and it is required here rather than defaulted
+	// somewhere convenient. A statement stored without it is measurably harder
+	// to retrieve than the same statement with it — seventeen points of hit@5,
+	// half of all top-five failures — and because records are immutable the loss
+	// cannot be repaired later. Rejecting the write is the only point at which
+	// it is still cheap.
+	if strings.TrimSpace(m.Context) == "" {
+		return fmt.Errorf("%w: context is empty, and it is what makes the statement findable once "+
+			"it is separated from the conversation it came from", ErrInvalid)
+	}
 	if len(m.Context) > MaxContextBytes {
 		return fmt.Errorf("%w: context is %d bytes, limit %d", ErrInvalid, len(m.Context), MaxContextBytes)
 	}

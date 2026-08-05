@@ -25,6 +25,26 @@ server and the viewer do not.
 - **Reclamation.** Storage that nothing points at is released, including storage stranded by an
   installation that no longer exists. Repack rewrites live records into fewer slabs and runs only
   when asked.
+- **Semantic recall with soft metadata filtering.** Tags and a record type supplied with a query
+  *prefer* matching records; they never exclude any. A tag guessed wrongly costs a little ranking
+  quality and nothing else, which is deliberate — as an exclusion, one wrong tag was measured
+  returning nothing at all for a sixth of queries.
+- **Context is required on every record**, and a record without it is rejected rather than stored
+  with a default. It is the single largest measured contributor to whether a record can be found
+  again, and records are immutable, so a missing context cannot be repaired afterwards.
+- **Supersession.** A record can replace an earlier one. The replaced version stops being the
+  current answer and stays retrievable as history.
+- **Write-time feedback.** Storing a record reports the records nearest to it, flags any close
+  enough to be a restatement, and says how many records already carry each tag used — so a tag too
+  common to narrow a search is visible while it is still cheap to change.
+- **The search index persists** as an immutable base plus appended deltas, folded together on a size
+  ratio, so restarting does not mean re-deriving every vector.
+- **A mixed-model index is detected.** Vectors from two embedding models cannot be compared, and
+  comparing them yields a plausible number rather than an error; vectors from another model are
+  refused, counted, and reported instead of silently searched.
+- **A recall regression suite** over a small committed corpus, reporting hit@k and mean reciprocal
+  rank on every run, alongside two axes that an aggregate hides: how crowded each query's
+  neighbourhood is, and which part of the vault its answers live in.
 - **Commands:** `init`, `remember`, `recall`, `flush`, `status`, `reclaim`, `recover`.
 - Project scaffolding: README, license, contribution guide, security policy, code of conduct.
 
@@ -37,6 +57,12 @@ server and the viewer do not.
 - **Repack is manual.** It holds the old and new storage at the same time, and its behaviour under
   concurrent writes and under interruption has not been measured, so nothing triggers it
   automatically.
+- **Retrieval quality depends on what else is in the vault.** A vault where nearly everything
+  concerns one subject is measurably harder to search than a varied one, because the records
+  competing with the right answer share its tags and the filter cannot tell them apart. Quoted
+  figures below say which case they describe.
+- **Recovering a vault re-derives every vector**, at roughly 0.45 s per record, so a large vault
+  takes a while to become searchable again after a recovery. The records themselves come back first.
 
 ### Notes
 
@@ -46,6 +72,16 @@ Design and feasibility work completed against the **live Sia network**. Findings
 - **Small records must be packed.** A storage slab is billed whole regardless of how little it holds, and a partially-filled slab can never be extended, so writes are batched into shared slabs, and periodic repack is a requirement rather than housekeeping.
 - **Writes parallelise.** Committing a thousand records went from ~361 s to ~4.8 s by pinning slabs once per flush and objects concurrently.
 - **Recovery does not depend on the index.** Records are self-describing on disk, so a full vault can be reconstructed from the recovery phrase and the indexer alone.
-- **Retrieval quality.** Semantic recall reached 0.949 hit@5 on a labelled corpus with soft metadata filtering. Filtering must *boost* rather than *exclude*, hard filtering fails badly on a single wrong tag. Recall degrades with topical *homogeneity* rather than corpus size.
+- **Retrieval quality, and which case each number describes.** On a labelled corpus with metadata
+  filtering, semantic recall reached **0.949 hit@5 in a vault of varied subject matter**. In a vault
+  of ten thousand records all concerning one subject, the same pipeline holds **0.797**. Filtering
+  helps in both cases and helps most where the competition is thickest, but it does not close the
+  gap. Both figures are the same measurement reported honestly; the first alone would not be.
+- **Filtering must prefer rather than exclude.** As an exclusion, a single wrong tag took hit@5 from
+  0.949 to 0.729 — below not filtering at all — and returned nothing whatever for a sixth of
+  queries. As a preference, the same wrong filter scores exactly what no filter scores.
+- **Recall is uneven inside a single vault**, and an average conceals it: the queries with the most
+  competing records scored 0.690 against 0.933 for the rest of the same vault. Quality is reported
+  per query as well as in aggregate for that reason.
 
 [Unreleased]: https://github.com/steven3002/mnemosia

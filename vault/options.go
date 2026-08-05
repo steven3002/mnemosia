@@ -103,3 +103,4 @@ func (o *Options) applyDefaults() {
 
 func (o *Options) dbPath() string      { return filepath.Join(o.Home, dbFile) }
 func (o *Options) manifestDir() string { return o.Home }
+func (o *Options) indexDir() string    { return o.Home }

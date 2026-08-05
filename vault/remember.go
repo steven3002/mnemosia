@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/steven3002/mnemosia/local"
 	"github.com/steven3002/mnemosia/manifest"
 	"github.com/steven3002/mnemosia/record"
 	"github.com/steven3002/mnemosia/seal"
@@ -19,6 +20,25 @@ type RememberRequest struct {
 	Type      record.Type
 	Tags      []string
 	Source    record.Source
+	// Supersedes names a record this one replaces. The older record is kept and
+	// stays reachable as history; it simply stops being the current answer.
+	Supersedes *record.ID
+	// Importance and Confidence are the caller's own judgement. The vault runs
+	// no model and does not infer them.
+	Importance float64
+	Confidence float64
+	// Links point at related records. They are provenance and navigation, not
+	// an input to ranking: expanding along them was measured across a hundred
+	// and nine configurations and never beat the unexpanded baseline.
+	Links []string
+	// ValidFrom and ValidUntil are when the statement is true of the world, as
+	// opposed to when the vault learned it.
+	ValidFrom  *record.Time
+	ValidUntil *record.Time
+	// Entities are the typed things the statement refers to.
+	Entities []record.Entity
+	// Keywords are extra lexical handles on the statement.
+	Keywords []string
 }
 
 // A RememberResult reports what was stored.
@@ -33,10 +53,25 @@ type RememberResult struct {
 	// Flushed describes the write, when one happened.
 	Flushed *store.Flush
 
+	// Neighbours are the records already in the vault closest to this one, so
+	// the caller can decide whether it has just added a fact, restated one, or
+	// contradicted one. The vault does not decide that: it runs no model, and
+	// the caller has the conversation this record came from.
+	Neighbours []Neighbour
+	// Conflicts are the neighbours close enough to be the same statement again.
+	// They are the subset of Neighbours marked Conflict, repeated here because
+	// they are the ones worth acting on.
+	Conflicts []Neighbour
+	// Tags reports how well the supplied tags separate this record from the rest
+	// of the vault.
+	Tags TagAdvice
+
 	// EmbedFor, SealFor and FlushFor are what the write actually spent.
 	EmbedFor time.Duration
 	SealFor  time.Duration
 	FlushFor time.Duration
+	// AdviseFor is what finding the neighbours and judging the tags cost.
+	AdviseFor time.Duration
 }
 
 // Remember stores a memory.
@@ -59,9 +94,17 @@ func (v *Vault) Remember(ctx context.Context, req RememberRequest) (RememberResu
 		Version:       1,
 		Statement:     req.Statement,
 		Context:       req.Context,
-		Tags:          req.Tags,
+		Keywords:      req.Keywords,
+		Tags:          local.NormalizeTags(req.Tags),
+		Entities:      req.Entities,
 		CreatedAt:     now,
 		UpdatedAt:     now,
+		ValidFrom:     req.ValidFrom,
+		ValidUntil:    req.ValidUntil,
+		Importance:    req.Importance,
+		Confidence:    req.Confidence,
+		Supersedes:    req.Supersedes,
+		Links:         req.Links,
 		Source:        req.Source,
 		Embedding: record.Embedding{
 			Model: v.opts.Model.Name,
@@ -70,6 +113,14 @@ func (v *Vault) Remember(ctx context.Context, req RememberRequest) (RememberResu
 	}
 	if err := memory.Validate(); err != nil {
 		return RememberResult{}, err
+	}
+	// A supersession has to name a record this vault actually holds. Accepting
+	// a pointer to nothing would hide the replaced record from recall without
+	// anything having replaced it.
+	if memory.Supersedes != nil {
+		if _, err := v.local.RankingMetaFor(*memory.Supersedes); err != nil {
+			return RememberResult{}, fmt.Errorf("supersede %s: %w", memory.Supersedes, err)
+		}
 	}
 
 	start := time.Now()
@@ -103,10 +154,10 @@ func (v *Vault) Remember(ctx context.Context, req RememberRequest) (RememberResu
 	if err := v.local.PutBody(id, record.KindMemory, body); err != nil {
 		return RememberResult{}, err
 	}
-	if err := v.local.PutVector(id, v.opts.Model.Name, vector); err != nil {
+	if err := v.putVector(id, vector); err != nil {
 		return RememberResult{}, err
 	}
-	if err := v.index.Add(id, vector); err != nil {
+	if err := v.local.PutRankingMeta(rankingMeta(memory)); err != nil {
 		return RememberResult{}, err
 	}
 
@@ -120,6 +171,20 @@ func (v *Vault) Remember(ctx context.Context, req RememberRequest) (RememberResu
 		return RememberResult{}, err
 	}
 	result.FlushFor = time.Since(start)
+
+	start = time.Now()
+	if result.Neighbours, err = v.neighbours(ctx, id, vector); err != nil {
+		return RememberResult{}, err
+	}
+	for _, neighbour := range result.Neighbours {
+		if neighbour.Conflict {
+			result.Conflicts = append(result.Conflicts, neighbour)
+		}
+	}
+	if result.Tags, err = v.tagAdvice(memory.Tags); err != nil {
+		return RememberResult{}, err
+	}
+	result.AdviseFor = time.Since(start)
 
 	for _, written := range flushed.Flush.Written {
 		if written.CID == cid.String() {
@@ -163,7 +228,12 @@ func (v *Vault) recordFlush(result packer.Result) error {
 		if err != nil {
 			return fmt.Errorf("catalog %s: %w", queued.ID, err)
 		}
-		if err := v.manifest.Append(manifest.Entry{
+		// The catalog carries the record's type and tags so that browsing and a
+		// recovered vault agree with what recall already knows. A record whose
+		// metadata cannot be read is still catalogued: losing the entry entirely
+		// would cost the record's location, which is the one thing only the
+		// catalog holds.
+		entry := manifest.Entry{
 			ID:        queued.ID,
 			Kind:      queued.Kind,
 			Version:   1,
@@ -172,7 +242,12 @@ func (v *Vault) recordFlush(result packer.Result) error {
 			SlabID:    string(written.SlabID),
 			Bytes:     written.Bytes,
 			WrittenAt: record.Now(),
-		}); err != nil {
+		}
+		if meta, err := v.local.RankingMetaFor(queued.ID); err == nil {
+			entry.Type = meta.Type
+			entry.Tags = meta.Tags
+		}
+		if err := v.manifest.Append(entry); err != nil {
 			return fmt.Errorf("catalog %s: %w", queued.ID, err)
 		}
 	}

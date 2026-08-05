@@ -1,0 +1,1328 @@
+{
+  "note": "Wholly invented. Tidepool is a fictional project and the people are fictional. See README.md.",
+  "records": [
+    {
+      "id": "t01",
+      "type": "fact",
+      "statement": "Tidepool stores tide readings as one row per station per hour rather than one row per reading.",
+      "context": "From the Tidepool storage design note, section on table layout. The team had been arguing about row counts for a week.",
+      "tags": [
+        "tidepool",
+        "storage",
+        "schema"
+      ],
+      "shape": "dominant"
+    },
+    {
+      "id": "t02",
+      "type": "fact",
+      "statement": "The hourly rollup cut Tidepool's row count from 4.2 billion to 71 million.",
+      "context": "Measured after the storage rewrite described in the Tidepool storage design note.",
+      "tags": [
+        "tidepool",
+        "storage",
+        "sizing"
+      ],
+      "shape": "dominant"
+    },
+    {
+      "id": "t03",
+      "type": "fact",
+      "statement": "A Tidepool station uploads its readings over a cellular modem that is only powered on for six minutes an hour.",
+      "context": "From the hardware section of the Tidepool field guide, explaining why uploads are batched.",
+      "tags": [
+        "tidepool",
+        "hardware",
+        "uploads"
+      ],
+      "shape": "dominant"
+    },
+    {
+      "id": "t04",
+      "type": "insight",
+      "statement": "Tidepool's upload batching exists because of the modem duty cycle, not because the network is slow.",
+      "context": "Conclusion drawn during the Tidepool latency review, correcting a common assumption on the team.",
+      "tags": [
+        "tidepool",
+        "uploads",
+        "latency"
+      ],
+      "shape": "dominant"
+    },
+    {
+      "id": "t05",
+      "type": "fact",
+      "statement": "Tidepool's prediction model is a harmonic fit over 37 tidal constituents.",
+      "context": "From the Tidepool prediction service README, the section describing what the model actually computes.",
+      "tags": [
+        "tidepool",
+        "prediction",
+        "model"
+      ],
+      "shape": "dominant"
+    },
+    {
+      "id": "t06",
+      "type": "fact",
+      "statement": "Adding constituents beyond 37 changed Tidepool's predicted heights by less than two centimetres.",
+      "context": "Measured during the Tidepool prediction accuracy study, which is why the constituent count was frozen.",
+      "tags": [
+        "tidepool",
+        "prediction",
+        "accuracy"
+      ],
+      "shape": "dominant"
+    },
+    {
+      "id": "t07",
+      "type": "fact",
+      "statement": "Tidepool refuses a prediction request for any station with fewer than 29 days of readings.",
+      "context": "From the Tidepool prediction service validation rules; 29 days is one full lunar month.",
+      "tags": [
+        "tidepool",
+        "prediction",
+        "validation"
+      ],
+      "shape": "dominant"
+    },
+    {
+      "id": "t08",
+      "type": "insight",
+      "statement": "The 29-day minimum for Tidepool predictions is a lunar month, not an arbitrary threshold.",
+      "context": "Explained in the Tidepool prediction service README after three people in a row asked why 29.",
+      "tags": [
+        "tidepool",
+        "prediction",
+        "validation"
+      ],
+      "shape": "dominant"
+    },
+    {
+      "id": "t09",
+      "type": "fact",
+      "statement": "Tidepool serves cached predictions for 6 hours before recomputing them.",
+      "context": "From the Tidepool caching policy, chosen so a cache entry never outlives a single tide cycle.",
+      "tags": [
+        "tidepool",
+        "cache",
+        "prediction"
+      ],
+      "shape": "dominant"
+    },
+    {
+      "id": "t10",
+      "type": "fact",
+      "statement": "Tidepool's cache hit rate in the first month of operation was 94 percent.",
+      "context": "Measured from the Tidepool service metrics, cited in the first monthly operations review.",
+      "tags": [
+        "tidepool",
+        "cache",
+        "metrics"
+      ],
+      "shape": "dominant"
+    },
+    {
+      "id": "t11",
+      "type": "fact",
+      "statement": "Station 4417 reported a tide height of 900 metres for eleven consecutive readings in March.",
+      "context": "From the Tidepool incident log for the sensor-fault investigation.",
+      "tags": [
+        "tidepool",
+        "incident",
+        "sensors"
+      ],
+      "shape": "dominant"
+    },
+    {
+      "id": "t12",
+      "type": "insight",
+      "statement": "Station 4417's impossible readings came from a pressure sensor reporting in the wrong unit after a firmware update.",
+      "context": "Root cause from the Tidepool sensor-fault investigation, closed two days after the incident opened.",
+      "tags": [
+        "tidepool",
+        "incident",
+        "sensors",
+        "firmware"
+      ],
+      "shape": "dominant"
+    },
+    {
+      "id": "t13",
+      "type": "fact",
+      "statement": "Tidepool rejects any tide reading above 20 metres at ingestion rather than at query time.",
+      "context": "Added to the Tidepool ingestion rules after the station 4417 incident.",
+      "tags": [
+        "tidepool",
+        "ingestion",
+        "validation",
+        "sensors"
+      ],
+      "shape": "dominant"
+    },
+    {
+      "id": "t14",
+      "type": "fact",
+      "statement": "Tidepool's ingestion pipeline drops roughly 300 readings a day to the 20-metre ceiling.",
+      "context": "Measured over the quarter after the ingestion rule was added, from the Tidepool operations review.",
+      "tags": [
+        "tidepool",
+        "ingestion",
+        "metrics"
+      ],
+      "shape": "dominant"
+    },
+    {
+      "id": "t15",
+      "type": "fact",
+      "statement": "Tidepool runs on three application servers behind a load balancer in a single region.",
+      "context": "From the Tidepool deployment topology document, current as of the last operations review.",
+      "tags": [
+        "tidepool",
+        "deployment",
+        "topology"
+      ],
+      "shape": "dominant"
+    },
+    {
+      "id": "t16",
+      "type": "fact",
+      "statement": "A full Tidepool deployment takes 4 minutes and 20 seconds, almost all of it waiting for health checks.",
+      "context": "Measured across twelve consecutive deployments, recorded in the Tidepool deployment topology document.",
+      "tags": [
+        "tidepool",
+        "deployment",
+        "latency"
+      ],
+      "shape": "dominant"
+    },
+    {
+      "id": "t17",
+      "type": "insight",
+      "statement": "Tidepool's deployment time is dominated by health-check backoff, so making the build faster would not help.",
+      "context": "Concluded during the Tidepool latency review, which had started with a proposal to parallelise the build.",
+      "tags": [
+        "tidepool",
+        "deployment",
+        "latency"
+      ],
+      "shape": "dominant"
+    },
+    {
+      "id": "t18",
+      "type": "fact",
+      "statement": "Tidepool's API returns heights in centimetres and always has.",
+      "context": "From the Tidepool API reference, restated after a client team assumed metres.",
+      "tags": [
+        "tidepool",
+        "api",
+        "units"
+      ],
+      "shape": "dominant"
+    },
+    {
+      "id": "t19",
+      "type": "correction",
+      "statement": "Tidepool's API has never returned heights in metres; the changelog entry claiming a unit change in version 2 was wrong.",
+      "context": "Correction issued after a client integration failed on the assumption that version 2 changed units.",
+      "tags": [
+        "tidepool",
+        "api",
+        "units"
+      ],
+      "shape": "dominant"
+    },
+    {
+      "id": "t20",
+      "type": "fact",
+      "statement": "The Tidepool team is four people, of whom two work on the prediction service.",
+      "context": "From the Tidepool project charter, current as of the last quarterly review.",
+      "tags": [
+        "tidepool",
+        "team"
+      ],
+      "shape": "dominant"
+    },
+    {
+      "id": "t21",
+      "type": "preference",
+      "statement": "The Tidepool team reviews pull requests in pairs rather than singly.",
+      "context": "A working agreement recorded in the Tidepool project charter, adopted after a bad merge.",
+      "tags": [
+        "tidepool",
+        "team",
+        "process"
+      ],
+      "shape": "dominant"
+    },
+    {
+      "id": "t22",
+      "type": "fact",
+      "statement": "Tidepool's test suite takes 90 seconds and its integration suite takes 11 minutes.",
+      "context": "Measured on the shared build machine, from the Tidepool contributor guide.",
+      "tags": [
+        "tidepool",
+        "testing",
+        "latency"
+      ],
+      "shape": "dominant"
+    },
+    {
+      "id": "t23",
+      "type": "fact",
+      "statement": "Tidepool's integration suite runs nightly rather than on every pull request.",
+      "context": "Decided in the Tidepool contributor guide because an 11-minute wait on every push was not worth the coverage.",
+      "tags": [
+        "tidepool",
+        "testing",
+        "process"
+      ],
+      "shape": "dominant"
+    },
+    {
+      "id": "t24",
+      "type": "fact",
+      "statement": "Tidepool keeps raw readings for 90 days and rollups forever.",
+      "context": "From the Tidepool retention policy, which balances storage cost against reprocessing ability.",
+      "tags": [
+        "tidepool",
+        "storage",
+        "retention"
+      ],
+      "shape": "dominant"
+    },
+    {
+      "id": "t25",
+      "type": "insight",
+      "statement": "Tidepool's 90-day raw retention is what makes a bad firmware rollout recoverable, because the rollups can be rebuilt.",
+      "context": "Argued during the Tidepool retention policy review, using the station 4417 incident as the example.",
+      "tags": [
+        "tidepool",
+        "storage",
+        "retention",
+        "incident"
+      ],
+      "shape": "dominant"
+    },
+    {
+      "id": "t26",
+      "type": "fact",
+      "statement": "Tidepool's monthly infrastructure bill is 340 dollars, of which 210 is object storage.",
+      "context": "From the Tidepool operations review, the cost breakdown section.",
+      "tags": [
+        "tidepool",
+        "cost"
+      ],
+      "shape": "dominant"
+    },
+    {
+      "id": "t27",
+      "type": "insight",
+      "statement": "Object storage dominates Tidepool's bill because raw readings are kept for 90 days, so retention is the cost lever.",
+      "context": "Concluded in the Tidepool operations review when the team looked for something to cut.",
+      "tags": [
+        "tidepool",
+        "cost",
+        "retention",
+        "storage"
+      ],
+      "shape": "dominant"
+    },
+    {
+      "id": "t28",
+      "type": "fact",
+      "statement": "Tidepool station identifiers are four digits and are assigned by the national survey, not by Tidepool.",
+      "context": "From the Tidepool field guide, in the section on registering a new station.",
+      "tags": [
+        "tidepool",
+        "stations",
+        "identifiers"
+      ],
+      "shape": "dominant"
+    },
+    {
+      "id": "t29",
+      "type": "fact",
+      "statement": "Two Tidepool stations can share a location but never share an identifier.",
+      "context": "From the Tidepool field guide, explaining the paired-sensor deployments at three harbours.",
+      "tags": [
+        "tidepool",
+        "stations",
+        "identifiers"
+      ],
+      "shape": "dominant"
+    },
+    {
+      "id": "t30",
+      "type": "doc",
+      "statement": "The Tidepool field guide is the document a new station operator is given, and it covers siting, power and registration.",
+      "context": "Index entry for the Tidepool documentation set.",
+      "tags": [
+        "tidepool",
+        "documentation"
+      ],
+      "shape": "dominant"
+    },
+    {
+      "id": "t31",
+      "type": "fact",
+      "statement": "Tidepool's alerting pages a human only when a station has been silent for more than three hours.",
+      "context": "From the Tidepool on-call runbook, chosen so a single missed upload window does not wake anyone.",
+      "tags": [
+        "tidepool",
+        "alerting",
+        "process"
+      ],
+      "shape": "dominant"
+    },
+    {
+      "id": "t32",
+      "type": "fact",
+      "statement": "Tidepool's on-call rotation is weekly and covers two of the four team members.",
+      "context": "From the Tidepool on-call runbook, current arrangement since the team grew to four.",
+      "tags": [
+        "tidepool",
+        "alerting",
+        "team",
+        "process"
+      ],
+      "shape": "dominant"
+    },
+    {
+      "id": "t33",
+      "type": "fact",
+      "statement": "Tidepool's staging environment shares a database with the development environment.",
+      "context": "From the Tidepool deployment topology document, noted as a known compromise.",
+      "tags": [
+        "tidepool",
+        "deployment",
+        "environments"
+      ],
+      "shape": "dominant"
+    },
+    {
+      "id": "t34",
+      "type": "fact",
+      "statement": "Tidepool's harmonic fit is recomputed for a station whenever it accumulates 90 new days of readings.",
+      "context": "From the Tidepool prediction service README, the section on model refresh.",
+      "tags": [
+        "tidepool",
+        "prediction",
+        "model"
+      ],
+      "shape": "dominant"
+    },
+    {
+      "id": "p01",
+      "type": "preference",
+      "statement": "Ines prefers meetings before eleven in the morning and declines anything after four.",
+      "context": "A standing scheduling preference, stated when the shared calendar was set up.",
+      "tags": [
+        "people",
+        "scheduling"
+      ],
+      "shape": "long-tail"
+    },
+    {
+      "id": "p02",
+      "type": "profile",
+      "statement": "Ines is the person to ask about anything involving the national survey's station registry.",
+      "context": "Noted after Ines handled three registry disputes in a row.",
+      "tags": [
+        "people",
+        "stations"
+      ],
+      "shape": "long-tail"
+    },
+    {
+      "id": "p03",
+      "type": "preference",
+      "statement": "I take my coffee as a single flat white and never after two in the afternoon.",
+      "context": "A standing personal preference, recorded so it stops being asked.",
+      "tags": [
+        "personal",
+        "food"
+      ],
+      "shape": "long-tail"
+    },
+    {
+      "id": "p04",
+      "type": "fact",
+      "statement": "The flat's boiler was serviced in October and the certificate is in the kitchen drawer.",
+      "context": "Household record, kept because the certificate is asked for annually.",
+      "tags": [
+        "home",
+        "maintenance"
+      ],
+      "shape": "long-tail"
+    },
+    {
+      "id": "p05",
+      "type": "fact",
+      "statement": "My passport expires in the March after next and needs six months' validity for most travel.",
+      "context": "Travel planning note, written while booking a trip that nearly failed the validity rule.",
+      "tags": [
+        "travel",
+        "documents"
+      ],
+      "shape": "long-tail"
+    },
+    {
+      "id": "p06",
+      "type": "preference",
+      "statement": "I would rather take an overnight train than an early flight for any journey under nine hours.",
+      "context": "A standing travel preference, recorded after two bad five-in-the-morning airport runs.",
+      "tags": [
+        "travel",
+        "preferences"
+      ],
+      "shape": "long-tail"
+    },
+    {
+      "id": "p07",
+      "type": "fact",
+      "statement": "The bicycle's rear hub needs a 15-millimetre cone spanner, which the basic toolkit does not include.",
+      "context": "Learned while attempting a repair with the wrong tools; written down to avoid repeating it.",
+      "tags": [
+        "hobbies",
+        "maintenance"
+      ],
+      "shape": "long-tail"
+    },
+    {
+      "id": "p08",
+      "type": "fact",
+      "statement": "The sourdough starter doubles in four hours at 24 degrees and in nine at 18.",
+      "context": "Measured across a summer and a winter, kept because the timing changes with the season.",
+      "tags": [
+        "personal",
+        "food"
+      ],
+      "shape": "long-tail"
+    },
+    {
+      "id": "p09",
+      "type": "profile",
+      "statement": "Dr Okonjo is the dentist and the practice only takes appointments by telephone.",
+      "context": "Recorded after twenty minutes spent looking for an online booking form that does not exist.",
+      "tags": [
+        "people",
+        "health"
+      ],
+      "shape": "long-tail"
+    },
+    {
+      "id": "p10",
+      "type": "fact",
+      "statement": "The building's recycling collection is on Tuesday mornings and glass is taken separately on the last Tuesday of the month.",
+      "context": "Household schedule, taken from the notice in the building's entrance hall.",
+      "tags": [
+        "home",
+        "scheduling"
+      ],
+      "shape": "long-tail"
+    },
+    {
+      "id": "p11",
+      "type": "preference",
+      "statement": "I read technical papers on paper and everything else on a screen.",
+      "context": "A standing personal preference, noticed after buying a second monitor that went unused.",
+      "tags": [
+        "personal",
+        "preferences"
+      ],
+      "shape": "long-tail"
+    },
+    {
+      "id": "p12",
+      "type": "correction",
+      "statement": "The recycling collection was never on Thursdays; the note that said so was copied from a neighbouring building.",
+      "context": "Correction issued after two weeks of putting bins out on the wrong day.",
+      "tags": [
+        "home",
+        "scheduling"
+      ],
+      "shape": "long-tail"
+    },
+    {
+      "id": "t35",
+      "type": "fact",
+      "statement": "Tidepool runs on five application servers behind a load balancer across two regions.",
+      "context": "From the Tidepool deployment topology document, updated after the second region was added.",
+      "tags": [
+        "tidepool",
+        "deployment",
+        "topology"
+      ],
+      "shape": "dominant",
+      "supersedes": "t15"
+    },
+    {
+      "id": "t36",
+      "type": "fact",
+      "statement": "Tidepool's rollup job runs at ten past every hour and takes about ninety seconds.",
+      "context": "From the Tidepool storage design note, the section on scheduling the rollup.",
+      "tags": [
+        "tidepool",
+        "storage",
+        "schema"
+      ],
+      "shape": "dominant"
+    },
+    {
+      "id": "t37",
+      "type": "fact",
+      "statement": "Tidepool stores each station's metadata in a separate table from its readings.",
+      "context": "From the Tidepool storage design note, the section on table layout.",
+      "tags": [
+        "tidepool",
+        "storage",
+        "schema"
+      ],
+      "shape": "dominant"
+    },
+    {
+      "id": "t38",
+      "type": "fact",
+      "statement": "Tidepool's readings table is partitioned by month and indexed on station identifier.",
+      "context": "From the Tidepool storage design note, describing the physical layout.",
+      "tags": [
+        "tidepool",
+        "storage",
+        "schema"
+      ],
+      "shape": "dominant"
+    },
+    {
+      "id": "t39",
+      "type": "fact",
+      "statement": "A Tidepool rollup row is 48 bytes and a raw reading row is 121 bytes.",
+      "context": "Measured from the Tidepool storage design note's sizing appendix.",
+      "tags": [
+        "tidepool",
+        "storage",
+        "sizing"
+      ],
+      "shape": "dominant"
+    },
+    {
+      "id": "t40",
+      "type": "fact",
+      "statement": "Tidepool's readings table grew by 2.1 gigabytes in its first quarter.",
+      "context": "From the Tidepool operations review, the storage growth section.",
+      "tags": [
+        "tidepool",
+        "storage",
+        "sizing"
+      ],
+      "shape": "dominant"
+    },
+    {
+      "id": "t41",
+      "type": "fact",
+      "statement": "Tidepool's prediction service exposes one endpoint per station and one for a bounded region.",
+      "context": "From the Tidepool API reference, the prediction endpoints section.",
+      "tags": [
+        "tidepool",
+        "prediction",
+        "api"
+      ],
+      "shape": "dominant"
+    },
+    {
+      "id": "t42",
+      "type": "fact",
+      "statement": "Tidepool's harmonic solver converges in under a second for a station with a year of readings.",
+      "context": "Measured during the Tidepool prediction accuracy study.",
+      "tags": [
+        "tidepool",
+        "prediction",
+        "model"
+      ],
+      "shape": "dominant"
+    },
+    {
+      "id": "t43",
+      "type": "fact",
+      "statement": "Tidepool's prediction error against observed heights has a root mean square of 8 centimetres.",
+      "context": "From the Tidepool prediction accuracy study, the headline result.",
+      "tags": [
+        "tidepool",
+        "prediction",
+        "accuracy"
+      ],
+      "shape": "dominant"
+    },
+    {
+      "id": "t44",
+      "type": "fact",
+      "statement": "Tidepool's predictions are published as hourly points rather than as a continuous curve.",
+      "context": "From the Tidepool prediction service README, the output format section.",
+      "tags": [
+        "tidepool",
+        "prediction",
+        "api"
+      ],
+      "shape": "dominant"
+    },
+    {
+      "id": "t45",
+      "type": "insight",
+      "statement": "Tidepool's prediction accuracy is limited by station siting rather than by the model.",
+      "context": "Concluded in the Tidepool prediction accuracy study after comparing sheltered and exposed stations.",
+      "tags": [
+        "tidepool",
+        "prediction",
+        "accuracy"
+      ],
+      "shape": "dominant"
+    },
+    {
+      "id": "t46",
+      "type": "fact",
+      "statement": "Tidepool's cache is keyed on station identifier and the hour the prediction is for.",
+      "context": "From the Tidepool caching policy, the key design section.",
+      "tags": [
+        "tidepool",
+        "cache",
+        "prediction"
+      ],
+      "shape": "dominant"
+    },
+    {
+      "id": "t47",
+      "type": "fact",
+      "statement": "Tidepool's cache holds about 40 megabytes in steady state.",
+      "context": "Measured from the Tidepool service metrics.",
+      "tags": [
+        "tidepool",
+        "cache",
+        "metrics"
+      ],
+      "shape": "dominant"
+    },
+    {
+      "id": "t48",
+      "type": "fact",
+      "statement": "A Tidepool cache miss costs 180 milliseconds and a hit costs 4.",
+      "context": "Measured from the Tidepool service metrics, quoted in the latency review.",
+      "tags": [
+        "tidepool",
+        "cache",
+        "latency"
+      ],
+      "shape": "dominant"
+    },
+    {
+      "id": "t49",
+      "type": "fact",
+      "statement": "Tidepool's cache is in process memory and is lost on every deployment.",
+      "context": "From the Tidepool caching policy, noted as an accepted cost.",
+      "tags": [
+        "tidepool",
+        "cache",
+        "deployment"
+      ],
+      "shape": "dominant"
+    },
+    {
+      "id": "t50",
+      "type": "fact",
+      "statement": "Tidepool's ingestion pipeline accepts readings up to 36 hours old and rejects anything older.",
+      "context": "From the Tidepool ingestion rules, alongside the height ceiling.",
+      "tags": [
+        "tidepool",
+        "ingestion",
+        "validation"
+      ],
+      "shape": "dominant"
+    },
+    {
+      "id": "t51",
+      "type": "fact",
+      "statement": "Tidepool's ingestion pipeline handles about 90 readings a second at peak.",
+      "context": "Measured from the Tidepool service metrics.",
+      "tags": [
+        "tidepool",
+        "ingestion",
+        "metrics"
+      ],
+      "shape": "dominant"
+    },
+    {
+      "id": "t52",
+      "type": "fact",
+      "statement": "Tidepool's ingestion rejects are written to a dead-letter table rather than discarded.",
+      "context": "From the Tidepool ingestion rules, the error handling section.",
+      "tags": [
+        "tidepool",
+        "ingestion",
+        "validation"
+      ],
+      "shape": "dominant"
+    },
+    {
+      "id": "t53",
+      "type": "fact",
+      "statement": "Tidepool's load balancer health check asks for a prediction at a known station.",
+      "context": "From the Tidepool deployment topology document, the health check section.",
+      "tags": [
+        "tidepool",
+        "deployment",
+        "topology"
+      ],
+      "shape": "dominant"
+    },
+    {
+      "id": "t54",
+      "type": "fact",
+      "statement": "Tidepool deploys on Tuesdays and Thursdays and never on a Friday.",
+      "context": "A working agreement from the Tidepool contributor guide.",
+      "tags": [
+        "tidepool",
+        "deployment",
+        "process"
+      ],
+      "shape": "dominant"
+    },
+    {
+      "id": "t55",
+      "type": "fact",
+      "statement": "Tidepool's rollback takes 40 seconds because it reuses the previous container image.",
+      "context": "Measured during the Tidepool deployment review.",
+      "tags": [
+        "tidepool",
+        "deployment",
+        "latency"
+      ],
+      "shape": "dominant"
+    },
+    {
+      "id": "t56",
+      "type": "fact",
+      "statement": "Tidepool's API is versioned in the path and version 1 is still served.",
+      "context": "From the Tidepool API reference, the versioning section.",
+      "tags": [
+        "tidepool",
+        "api",
+        "versioning"
+      ],
+      "shape": "dominant"
+    },
+    {
+      "id": "t57",
+      "type": "fact",
+      "statement": "Tidepool's API returns timestamps in UTC with no offset field.",
+      "context": "From the Tidepool API reference, the response format section.",
+      "tags": [
+        "tidepool",
+        "api",
+        "units"
+      ],
+      "shape": "dominant"
+    },
+    {
+      "id": "t58",
+      "type": "fact",
+      "statement": "Tidepool's API rate limit is 60 requests a minute per key.",
+      "context": "From the Tidepool API reference, the limits section.",
+      "tags": [
+        "tidepool",
+        "api"
+      ],
+      "shape": "dominant"
+    },
+    {
+      "id": "t59",
+      "type": "fact",
+      "statement": "Tidepool's test suite runs against an in-memory database and the integration suite against a real one.",
+      "context": "From the Tidepool contributor guide, the testing section.",
+      "tags": [
+        "tidepool",
+        "testing",
+        "process"
+      ],
+      "shape": "dominant"
+    },
+    {
+      "id": "t60",
+      "type": "fact",
+      "statement": "Tidepool's integration suite spends most of its time seeding 29 days of readings.",
+      "context": "Measured while investigating the Tidepool integration suite's runtime.",
+      "tags": [
+        "tidepool",
+        "testing",
+        "latency"
+      ],
+      "shape": "dominant"
+    },
+    {
+      "id": "t61",
+      "type": "fact",
+      "statement": "Tidepool's alerting also fires when the ingestion dead-letter rate exceeds one percent.",
+      "context": "From the Tidepool on-call runbook, the alert list.",
+      "tags": [
+        "tidepool",
+        "alerting",
+        "ingestion"
+      ],
+      "shape": "dominant"
+    },
+    {
+      "id": "t62",
+      "type": "fact",
+      "statement": "Tidepool's on-call handover happens on Monday mornings at the stand-up.",
+      "context": "From the Tidepool on-call runbook, the rotation section.",
+      "tags": [
+        "tidepool",
+        "alerting",
+        "process"
+      ],
+      "shape": "dominant"
+    },
+    {
+      "id": "t63",
+      "type": "fact",
+      "statement": "Tidepool's incident log is kept in the same repository as the code.",
+      "context": "From the Tidepool contributor guide, the documentation section.",
+      "tags": [
+        "tidepool",
+        "incident",
+        "documentation"
+      ],
+      "shape": "dominant"
+    },
+    {
+      "id": "t64",
+      "type": "fact",
+      "statement": "Tidepool has had four incidents since launch, of which two were sensor faults.",
+      "context": "From the Tidepool operations review, the reliability section.",
+      "tags": [
+        "tidepool",
+        "incident",
+        "metrics"
+      ],
+      "shape": "dominant"
+    },
+    {
+      "id": "t65",
+      "type": "fact",
+      "statement": "Tidepool's retention policy was reviewed once and left unchanged.",
+      "context": "From the Tidepool operations review, the retention section.",
+      "tags": [
+        "tidepool",
+        "retention",
+        "process"
+      ],
+      "shape": "dominant"
+    },
+    {
+      "id": "t66",
+      "type": "fact",
+      "statement": "Tidepool's object storage bill grew 12 percent last quarter.",
+      "context": "From the Tidepool operations review, the cost breakdown section.",
+      "tags": [
+        "tidepool",
+        "cost",
+        "storage"
+      ],
+      "shape": "dominant"
+    },
+    {
+      "id": "t67",
+      "type": "fact",
+      "statement": "Tidepool's compute bill is 90 dollars a month and has been flat.",
+      "context": "From the Tidepool operations review, the cost breakdown section.",
+      "tags": [
+        "tidepool",
+        "cost"
+      ],
+      "shape": "dominant"
+    },
+    {
+      "id": "t68",
+      "type": "fact",
+      "statement": "A Tidepool station's power budget allows one upload window an hour in winter and two in summer.",
+      "context": "From the Tidepool field guide, the power section.",
+      "tags": [
+        "tidepool",
+        "hardware",
+        "uploads"
+      ],
+      "shape": "dominant"
+    },
+    {
+      "id": "t69",
+      "type": "fact",
+      "statement": "Tidepool stations are sited by the national survey and Tidepool has no say in it.",
+      "context": "From the Tidepool field guide, the siting section.",
+      "tags": [
+        "tidepool",
+        "stations",
+        "hardware"
+      ],
+      "shape": "dominant"
+    },
+    {
+      "id": "t70",
+      "type": "fact",
+      "statement": "Tidepool has 212 registered stations of which 197 report regularly.",
+      "context": "From the Tidepool operations review, the coverage section.",
+      "tags": [
+        "tidepool",
+        "stations",
+        "metrics"
+      ],
+      "shape": "dominant"
+    }
+  ],
+  "queries": [
+    {
+      "id": "q01",
+      "query": "why does Tidepool batch its uploads instead of sending readings as they arrive",
+      "gold": [
+        "t04",
+        "t03"
+      ],
+      "filter": {
+        "tags": [
+          "tidepool",
+          "uploads"
+        ],
+        "types": [
+          "insight",
+          "fact"
+        ]
+      }
+    },
+    {
+      "id": "q02",
+      "query": "how many tidal constituents does the prediction model use",
+      "gold": [
+        "t05"
+      ],
+      "filter": {
+        "tags": [
+          "tidepool",
+          "prediction",
+          "model"
+        ],
+        "types": [
+          "fact"
+        ]
+      }
+    },
+    {
+      "id": "q03",
+      "query": "why is there a 29 day minimum before a station gets predictions",
+      "gold": [
+        "t08",
+        "t07"
+      ],
+      "filter": {
+        "tags": [
+          "tidepool",
+          "prediction",
+          "validation"
+        ],
+        "types": [
+          "insight",
+          "fact"
+        ]
+      }
+    },
+    {
+      "id": "q04",
+      "query": "what caused the impossible tide readings at one of the stations",
+      "gold": [
+        "t12",
+        "t11"
+      ],
+      "filter": {
+        "tags": [
+          "tidepool",
+          "incident",
+          "sensors"
+        ],
+        "types": [
+          "insight",
+          "fact"
+        ]
+      }
+    },
+    {
+      "id": "q05",
+      "query": "what did we change after the sensor fault",
+      "gold": [
+        "t13"
+      ],
+      "filter": {
+        "tags": [
+          "tidepool",
+          "ingestion",
+          "sensors"
+        ],
+        "types": [
+          "fact"
+        ]
+      }
+    },
+    {
+      "id": "q06",
+      "query": "what units does the API return heights in",
+      "gold": [
+        "t18",
+        "t19"
+      ],
+      "filter": {
+        "tags": [
+          "tidepool",
+          "api",
+          "units"
+        ],
+        "types": [
+          "fact",
+          "correction"
+        ]
+      }
+    },
+    {
+      "id": "q07",
+      "query": "what did we get wrong and have to correct",
+      "gold": [
+        "t19",
+        "p12"
+      ],
+      "filter": {
+        "types": [
+          "correction"
+        ]
+      }
+    },
+    {
+      "id": "q08",
+      "query": "why is deployment slow and would a faster build fix it",
+      "gold": [
+        "t17",
+        "t16"
+      ],
+      "filter": {
+        "tags": [
+          "tidepool",
+          "deployment",
+          "latency"
+        ],
+        "types": [
+          "insight",
+          "fact"
+        ]
+      }
+    },
+    {
+      "id": "q09",
+      "query": "what is the biggest thing we could cut from the infrastructure bill",
+      "gold": [
+        "t27",
+        "t26"
+      ],
+      "filter": {
+        "tags": [
+          "tidepool",
+          "cost"
+        ],
+        "types": [
+          "insight",
+          "fact"
+        ]
+      }
+    },
+    {
+      "id": "q10",
+      "query": "how long do we keep raw readings before they are discarded",
+      "gold": [
+        "t24"
+      ],
+      "filter": {
+        "tags": [
+          "tidepool",
+          "retention",
+          "storage"
+        ],
+        "types": [
+          "fact"
+        ]
+      }
+    },
+    {
+      "id": "q11",
+      "query": "when does alerting actually wake somebody up",
+      "gold": [
+        "t31"
+      ],
+      "filter": {
+        "tags": [
+          "tidepool",
+          "alerting"
+        ],
+        "types": [
+          "fact"
+        ]
+      }
+    },
+    {
+      "id": "q12",
+      "query": "who assigns station identifiers",
+      "gold": [
+        "t28"
+      ],
+      "filter": {
+        "tags": [
+          "tidepool",
+          "stations",
+          "identifiers"
+        ],
+        "types": [
+          "fact"
+        ]
+      }
+    },
+    {
+      "id": "q13",
+      "query": "how much did the hourly rollup reduce the number of rows",
+      "gold": [
+        "t02"
+      ],
+      "filter": {
+        "tags": [
+          "tidepool",
+          "storage",
+          "sizing"
+        ],
+        "types": [
+          "fact"
+        ]
+      }
+    },
+    {
+      "id": "q14",
+      "query": "why does the integration suite not run on every change",
+      "gold": [
+        "t23",
+        "t22"
+      ],
+      "filter": {
+        "tags": [
+          "tidepool",
+          "testing"
+        ],
+        "types": [
+          "fact"
+        ]
+      }
+    },
+    {
+      "id": "q15",
+      "query": "how many application servers are we running",
+      "gold": [
+        "t35"
+      ],
+      "filter": {
+        "tags": [
+          "tidepool",
+          "deployment",
+          "topology"
+        ],
+        "types": [
+          "fact"
+        ]
+      }
+    },
+    {
+      "id": "q16",
+      "query": "when will Ines take a meeting",
+      "gold": [
+        "p01"
+      ],
+      "filter": {
+        "tags": [
+          "people",
+          "scheduling"
+        ],
+        "types": [
+          "preference"
+        ]
+      }
+    },
+    {
+      "id": "q17",
+      "query": "which day do the bins go out",
+      "gold": [
+        "p10",
+        "p12"
+      ],
+      "filter": {
+        "tags": [
+          "home",
+          "scheduling"
+        ],
+        "types": [
+          "fact",
+          "correction"
+        ]
+      }
+    },
+    {
+      "id": "q18",
+      "query": "how do I book the dentist",
+      "gold": [
+        "p09"
+      ],
+      "filter": {
+        "tags": [
+          "people",
+          "health"
+        ],
+        "types": [
+          "profile"
+        ]
+      }
+    },
+    {
+      "id": "q19",
+      "query": "what tool do I need for the bike's back wheel",
+      "gold": [
+        "p07"
+      ],
+      "filter": {
+        "tags": [
+          "hobbies",
+          "maintenance"
+        ],
+        "types": [
+          "fact"
+        ]
+      }
+    },
+    {
+      "id": "q20",
+      "query": "how long does the starter take to rise in winter",
+      "gold": [
+        "p08"
+      ],
+      "filter": {
+        "tags": [
+          "personal",
+          "food"
+        ],
+        "types": [
+          "fact"
+        ]
+      }
+    },
+    {
+      "id": "q21",
+      "query": "what is the airspeed velocity of an unladen swallow",
+      "gold": [],
+      "filter": {}
+    }
+  ]
+}

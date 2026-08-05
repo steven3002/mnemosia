@@ -122,6 +122,13 @@ func (v *Vault) recoverFrame(ctx context.Context, frame seal.Frame, object sia.S
 	if err := v.local.PutBody(frame.ID, frame.Kind, body); err != nil {
 		return false, err
 	}
+	// Ranking metadata is restored whether or not vectors are, because it costs
+	// one row and the alternative is a vault whose supersessions are invisible.
+	// A recovered record that has been replaced would otherwise come back as the
+	// current answer until something re-embedded it.
+	if err := v.local.PutRankingMeta(rankingMeta(memory)); err != nil {
+		return false, err
+	}
 	cid, err := v.sealer.CID(body)
 	if err != nil {
 		return false, err
@@ -153,10 +160,7 @@ func (v *Vault) recoverFrame(ctx context.Context, frame seal.Frame, object sia.S
 	if err != nil {
 		return false, fmt.Errorf("re-embed %s: %w", frame.ID, err)
 	}
-	if err := v.local.PutVector(frame.ID, v.opts.Model.Name, vector); err != nil {
-		return false, err
-	}
-	if err := v.index.Add(frame.ID, vector); err != nil {
+	if err := v.putVector(frame.ID, vector); err != nil {
 		return false, err
 	}
 	return true, nil

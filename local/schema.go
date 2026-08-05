@@ -11,12 +11,43 @@ var schema = []string{
 		body       BLOB NOT NULL,
 		created_at TEXT NOT NULL
 	)`,
-	`CREATE TABLE IF NOT EXISTS vectors (
-		record_id TEXT PRIMARY KEY REFERENCES bodies(record_id) ON DELETE CASCADE,
-		model     TEXT NOT NULL,
-		dim       INTEGER NOT NULL,
-		vector    BLOB NOT NULL
+	// Vectors used to live here. They moved to a base-plus-delta pair of files
+	// beside the catalog, for two reasons. One is write amplification, the same
+	// reason the catalog is shaped that way. The other is that a row keyed to
+	// bodies with a cascade meant that dropping this device's copy of a record —
+	// which is how the lower read tiers are reached at all — silently deleted
+	// its vector and made the record unsearchable.
+	`DROP TABLE IF EXISTS vectors`,
+	// The metadata ranking needs, held apart from the bodies it describes.
+	//
+	// Ranking reads this before it fetches anything: a boost has to be applied
+	// while the candidate list is still being ordered, and by the time a body
+	// has been fetched the ordering is already decided. Reading it from the
+	// bodies would also make ranking depend on the device still holding them,
+	// which it deliberately may not.
+	//
+	// Deliberately NOT keyed to bodies with a cascade. Dropping the local copy
+	// of a record is how the lower read tiers are reached at all; the record is
+	// still on the network and still has to rank.
+	`CREATE TABLE IF NOT EXISTS record_meta (
+		record_id  TEXT PRIMARY KEY,
+		type       TEXT NOT NULL,
+		supersedes TEXT,
+		created_at TEXT NOT NULL
 	)`,
+	// Which record each supersession points at, so the set of superseded
+	// records is a lookup rather than a scan.
+	`CREATE INDEX IF NOT EXISTS record_meta_supersedes ON record_meta(supersedes)`,
+	// Tags one per row rather than a list in a column, because the two things
+	// that read them want opposite shapes: ranking wants a record's tags, and
+	// the write path wants a tag's frequency across the vault. A column of JSON
+	// serves the first and makes the second a full scan.
+	`CREATE TABLE IF NOT EXISTS record_tags (
+		record_id TEXT NOT NULL,
+		tag       TEXT NOT NULL,
+		PRIMARY KEY (record_id, tag)
+	)`,
+	`CREATE INDEX IF NOT EXISTS record_tags_by_tag ON record_tags(tag)`,
 	// Location metadata is split in two, because the two halves have wildly
 	// different multiplicities. The sector list and coding parameters are
 	// identical for every object packed into one slab and run to several

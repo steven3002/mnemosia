@@ -15,6 +15,9 @@ func runRecall(ctx context.Context, args []string) error {
 	var flags vaultFlags
 	flags.bind(fs)
 	limit := fs.Int("limit", recall.DefaultLimit, "how many records to return")
+	tags := fs.String("tags", "", "comma-separated tags the answer is likely to carry; these prefer, never exclude")
+	types := fs.String("types", "", "comma-separated record types that could answer this")
+	history := fs.Bool("history", false, "include versions that have since been superseded")
 	fromNetwork := fs.Bool("from-network", false,
 		"read bodies from Sia even when this device holds a copy, to check the stored data")
 	if err := fs.Parse(args); err != nil {
@@ -31,13 +34,22 @@ func runRecall(ctx context.Context, args []string) error {
 	}
 	defer v.Close()
 
-	result, err := v.Recall(ctx, recall.Request{Query: query, Limit: *limit})
+	result, err := v.Recall(ctx, recall.Request{
+		Query:             query,
+		Limit:             *limit,
+		Filter:            recall.Filter{Tags: splitTags(*tags), Types: splitTypes(*types)},
+		IncludeSuperseded: *history,
+	})
 	if err != nil {
 		return err
 	}
 
 	fmt.Fprintf(stderr, "  embed %s · search %s over %d vector(s) · fetch %s\n",
 		took(result.EmbedFor), took(result.SearchFor), result.Searched, took(result.FetchFor))
+	if result.SupersededHidden > 0 {
+		fmt.Fprintf(stderr, "  %d superseded version(s) held back; -history returns them\n",
+			result.SupersededHidden)
+	}
 
 	// No results is an answer, not a failure. A memory store that returns its
 	// least-bad guess when it holds nothing relevant is worse than one that
@@ -58,6 +70,9 @@ func runRecall(ctx context.Context, args []string) error {
 			memory, source, elapsed = fetched, "network", time.Since(start)
 		}
 		fmt.Printf("%d. [%.4f] %s\n", n+1, hit.Score, memory.Statement)
+		if hit.Boost > 0 {
+			fmt.Printf("   similarity %.4f + filter %.4f\n", hit.Similarity, hit.Boost)
+		}
 		if memory.Context != "" {
 			fmt.Printf("   context: %s\n", memory.Context)
 		}

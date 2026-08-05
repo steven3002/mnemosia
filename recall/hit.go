@@ -25,24 +25,18 @@ const (
 // A Hit is one recalled record with the evidence for why it was returned.
 type Hit struct {
 	Memory *record.Memory
-	// Score is cosine similarity against the query, in [-1, 1].
+	// Score is what the record was ranked on: its similarity plus any boost.
 	Score float32
+	// Similarity is cosine similarity against the query, in [-1, 1].
+	//
+	// It is reported separately from Score so a caller can always see how much
+	// of a record's position it earned by meaning and how much by matching the
+	// filter it was given.
+	Similarity float32
+	// Boost is how far the filter moved this record.
+	Boost float32
 	// Tier is where the body was read from.
 	Tier Tier
 	// FetchedIn is how long fetching and decrypting this record took.
 	FetchedIn time.Duration
 }
-
-// A Filter narrows a recall.
-//
-// It boosts, never excludes. Applied as an exclusion, a single wrong tag
-// returns nothing at all for a sixth of queries, worse than no filter, while
-// the same wrong filter applied as a boost merely stops helping. A filter must
-// never become a where clause.
-type Filter struct {
-	Types []record.Type
-	Tags  []string
-}
-
-// Empty reports whether the filter would change any ranking.
-func (f Filter) Empty() bool { return len(f.Types) == 0 && len(f.Tags) == 0 }
