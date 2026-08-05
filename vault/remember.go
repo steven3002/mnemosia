@@ -110,9 +110,6 @@ func (v *Vault) Remember(ctx context.Context, req RememberRequest) (RememberResu
 		return RememberResult{}, err
 	}
 
-	if v.packer == nil {
-		return result, nil
-	}
 	start = time.Now()
 	flushed, err := v.packer.Add(ctx, packer.Queued{
 		ID:   id,
@@ -136,9 +133,6 @@ func (v *Vault) Remember(ctx context.Context, req RememberRequest) (RememberResu
 
 // Flush writes everything queued to the network.
 func (v *Vault) Flush(ctx context.Context) (*store.Flush, error) {
-	if v.packer == nil {
-		return nil, errOffline
-	}
 	result, err := v.packer.Flush(ctx)
 	if err != nil {
 		return nil, err

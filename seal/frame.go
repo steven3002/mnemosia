@@ -86,6 +86,27 @@ func Unframe(b []byte) (Frame, []byte, error) {
 	return Frame{Kind: kind, ID: id, Sealed: body[5+idLen:]}, rest, nil
 }
 
+// Frames walks a packed blob and returns every record in it.
+//
+// It returns what it recovered alongside the reason it stopped, rather than
+// discarding the lot on the first bad byte. That is the whole point of framing:
+// a blob that has been truncated or damaged still yields every record before
+// the damage, so a fault costs the tail of one object instead of everything in
+// it. Callers that require the blob to be intact check the error; callers
+// rebuilding a vault take the records and note the loss.
+func Frames(blob []byte) ([]Frame, error) {
+	var out []Frame
+	for len(blob) > 0 {
+		frame, rest, err := Unframe(blob)
+		if err != nil {
+			return out, err
+		}
+		out = append(out, frame)
+		blob = rest
+	}
+	return out, nil
+}
+
 // FrameOverhead is the framing cost for one record id of the current size.
 func FrameOverhead(sealedLen int) int {
 	body := 5 + frameIDLen + sealedLen

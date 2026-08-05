@@ -40,6 +40,19 @@ func (s *Store) GetBody(id record.ID) ([]byte, error) {
 	return body, nil
 }
 
+// ForgetBody drops this device's copy of a record.
+//
+// The record itself is untouched: it is on the network, the catalog still
+// points at it, and the next read fetches it back. It exists so the tiers below
+// the device's own copy can be reached at all, which is otherwise impossible on
+// the machine that wrote the record.
+func (s *Store) ForgetBody(id record.ID) error {
+	if _, err := s.db.Exec(`DELETE FROM bodies WHERE record_id = ?`, id.String()); err != nil {
+		return fmt.Errorf("forget body %s: %w", id, err)
+	}
+	return nil
+}
+
 // CountBodies reports how many records the device holds.
 func (s *Store) CountBodies() (int, error) {
 	var n int

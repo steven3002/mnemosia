@@ -11,6 +11,8 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"sync"
+	"time"
 
 	"go.sia.tech/core/types"
 	"go.sia.tech/indexd/api/app"
@@ -33,6 +35,12 @@ type Client struct {
 	app     *app.Client
 	appKey  types.PrivateKey
 	indexer string
+
+	// The account's host set, held briefly so that cached object locations can
+	// be checked against it without a round trip each time.
+	hostsMu sync.Mutex
+	hosts   map[types.PublicKey]struct{}
+	hostsAt time.Time
 }
 
 // Config parameterises a connection.

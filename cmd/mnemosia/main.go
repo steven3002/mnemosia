@@ -28,6 +28,14 @@ func main() {
 		err = runRemember(ctx, os.Args[2:])
 	case "recall":
 		err = runRecall(ctx, os.Args[2:])
+	case "flush":
+		err = runFlush(ctx, os.Args[2:])
+	case "status":
+		err = runStatus(ctx, os.Args[2:])
+	case "reclaim":
+		err = runReclaim(ctx, os.Args[2:])
+	case "recover":
+		err = runRecover(ctx, os.Args[2:])
 	case "help", "-h", "--help":
 		usage()
 		return
@@ -68,6 +76,10 @@ usage:
   mnemosia init                      derive keys, prepare the vault, connect
   mnemosia remember "<statement>"    store a memory
   mnemosia recall "<query>"          retrieve memories by meaning
+  mnemosia flush                     write queued records to Sia now
+  mnemosia status                    what is held, what is queued, what is billed
+  mnemosia reclaim                   release storage nothing points at any more
+  mnemosia recover                   rebuild this vault from the phrase and the indexer
 
 environment:
   MNEMOSIA_PHRASE     BIP-39 recovery phrase; read from stdin when unset

@@ -4,7 +4,7 @@
 
 Mnemosia gives an AI agent a long-term memory that belongs to **you** rather than to a vendor: encrypted on your device, stored on decentralized infrastructure that cannot read it, retrieved by meaning, and portable across apps, models and machines.
 
-> **Status: pre-alpha, in active development.** The design is settled and the storage layer is validated against the live Sia network, but **there is no usable release yet.** Nothing here is production-ready. See [Status](#status).
+> **Status: pre-alpha, in active development.** The storage layer is built and validated against the live Sia network, but **there is no usable release yet** and the MCP server does not exist. Nothing here is production-ready. See [Status](#status).
 
 ---
 
@@ -42,16 +42,20 @@ recall   ──▶ embed query locally ──▶ local vector search ──▶ f
 
 ## Status
 
-Design and feasibility work is complete and measured against the live network. Implementation of the product itself has not started.
+The storage substrate and a command-line interface over it are built and measured against the live
+network. The MCP server and the viewer are not.
 
-**Validated against live Sia:**
+**Working, and measured against live Sia:**
 - End-to-end round-trip, byte-exact, with client-side encryption
-- Interactive read latency (p50 ~210 ms cold; ~42 ms warm)
-- Packed writes, many small records share one storage slab
-- Storage reclamation and repack correctness
+- A thousand records written into one storage slab, and any one of them read back on its own
+- A vault rebuilt from the recovery phrase and the indexer with its catalog deleted
+- Reclamation that returns exactly the space it should and nothing that is still in use
+- Repack that rewrites every storage location without disturbing a single record identity
+- Three-tier reads, from the device's own copy through a cached location to a cold fetch
 - Semantic recall quality on a labelled evaluation corpus
 
-**Not yet built:** the substrate library, the MCP server, the CLI, and the local viewer.
+**Not yet built:** the MCP server and the local viewer. Retrieval currently ranks by meaning alone —
+metadata filtering is specified but deliberately not applied yet.
 
 There is **no install path yet.** Watch the repository or the [CHANGELOG](CHANGELOG.md) for the first release.
 
@@ -71,7 +75,9 @@ There is **no install path yet.** Watch the repository or the [CHANGELOG](CHANGE
 
 ## Contributing
 
-Early and in flux, the architecture is settled but the code isn't written. See [CONTRIBUTING.md](CONTRIBUTING.md). Bug reports and design discussion are welcome; please open an issue before a large pull request.
+Early and in flux: the architecture is settled and the storage layer is written, but the surfaces
+above it are not. See [CONTRIBUTING.md](CONTRIBUTING.md). Bug reports and design discussion are
+welcome; please open an issue before a large pull request.
 
 ## Security
 

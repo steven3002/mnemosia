@@ -1,0 +1,270 @@
+package main
+
+import (
+	"context"
+	"flag"
+	"fmt"
+	"time"
+
+	"github.com/steven3002/mnemosia/record"
+	"github.com/steven3002/mnemosia/vault"
+)
+
+// runFlush writes whatever is queued to Sia.
+//
+// A record is durable on this device the moment it is remembered and on the
+// network only after a flush. The standing cadence closes that gap on its own;
+// this is for closing it now.
+func runFlush(ctx context.Context, args []string) error {
+	fs := flag.NewFlagSet("flush", flag.ExitOnError)
+	var flags vaultFlags
+	flags.bind(fs)
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+
+	v, err := flags.open(ctx)
+	if err != nil {
+		return err
+	}
+	defer v.Close()
+
+	pending := v.Pending()
+	if pending == 0 {
+		fmt.Fprint(stderr, "nothing queued: everything on this device is on Sia\n")
+		return nil
+	}
+	fmt.Fprintf(stderr, "flushing %d record(s)\n", pending)
+
+	flushed, err := v.Flush(ctx)
+	if err != nil {
+		return err
+	}
+	if flushed == nil {
+		fmt.Fprint(stderr, "the flush wrote nothing\n")
+		return nil
+	}
+	fmt.Fprintf(stderr, "  wrote     %s in %d object(s) over %d slab(s)\n",
+		humanBytes(uint64(flushed.Bytes())), len(flushed.Written), len(flushed.Slabs))
+	fmt.Fprintf(stderr, "  upload    %s · pin slabs %s · pin objects %s\n",
+		took(flushed.UploadFor), took(flushed.PinSlabsFor), took(flushed.PinObjectFor))
+	if n := len(flushed.Written); n > 0 {
+		fmt.Fprintf(stderr, "  per pin   %s across %d object(s)\n",
+			took(flushed.PinObjectFor/time.Duration(n)), n)
+	}
+	return nil
+}
+
+// runStatus reports what the vault holds, what it owes the network, and what
+// it is being billed for.
+func runStatus(ctx context.Context, args []string) error {
+	fs := flag.NewFlagSet("status", flag.ExitOnError)
+	var flags vaultFlags
+	flags.bind(fs)
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+
+	v, err := flags.open(ctx)
+	if err != nil {
+		return err
+	}
+	defer v.Close()
+
+	entries := v.Entries()
+	fmt.Fprintf(stderr, "records   %d catalogued, %d queued for Sia\n", len(entries), v.Pending())
+
+	stats := v.ManifestStats()
+	fmt.Fprintf(stderr, "catalog   %s snapshot + %s log, %d compaction(s), %s written\n",
+		humanBytes(uint64(stats.SnapshotBytes)), humanBytes(uint64(stats.LogBytes)),
+		stats.Compactions, humanBytes(uint64(stats.Written)))
+
+	if cache, err := v.CacheSize(); err == nil && cache.Objects > 0 {
+		fmt.Fprintf(stderr, "locations %s for %d object(s) over %d slab(s), %.0f B/object\n",
+			humanBytes(uint64(cache.Total())), cache.Objects, cache.Slabs, cache.PerObject())
+	}
+
+	if tiers, err := v.ReadStats(); err == nil && len(tiers) > 0 {
+		fmt.Fprint(stderr, "reads\n")
+		for _, tier := range tiers {
+			fmt.Fprintf(stderr, "  %-8s %6d served, mean %s, %d miss(es)\n",
+				tier.Tier, tier.Reads, took(tier.Mean()), tier.Misses)
+		}
+	}
+
+	if !v.Online() {
+		fmt.Fprint(stderr, "offline: queued records stay on this device until a connected run\n")
+		return nil
+	}
+
+	account, err := v.Account(ctx)
+	if err != nil {
+		return err
+	}
+	slabs, err := v.TrackedSlabs()
+	if err != nil {
+		return err
+	}
+	fmt.Fprintf(stderr, "quota     %s of %s used, %s free\n",
+		humanBytes(account.PinnedData), humanBytes(account.MaxPinnedData), humanBytes(account.Free()))
+	fmt.Fprintf(stderr, "slabs     %d pinned by this vault\n", len(slabs))
+
+	mark, err := v.Watermark(ctx)
+	if err != nil {
+		return err
+	}
+	fmt.Fprintf(stderr, "repack    %.1f%% of quota used; %s\n", 100*mark.Used, repackAdvice(mark.Due, mark.Affordable))
+	return nil
+}
+
+func repackAdvice(due, affordable bool) string {
+	switch {
+	case due && affordable:
+		return "worth running, and there is room for it"
+	case due:
+		return "worth running, but there is no longer room for the slabs it would hold at once"
+	default:
+		return "not needed yet"
+	}
+}
+
+// runReclaim releases storage nothing points at any more.
+func runReclaim(ctx context.Context, args []string) error {
+	fs := flag.NewFlagSet("reclaim", flag.ExitOnError)
+	var flags vaultFlags
+	flags.bind(fs)
+	repack := fs.Bool("repack", false,
+		"rewrite every live record into as few slabs as it fits in before releasing the rest")
+	orphans := fs.Bool("orphans", false,
+		"also release slabs the account is billed for that hold nothing, including any stranded by an installation that is gone")
+	unreadable := fs.Bool("unreadable", false,
+		"also delete objects the indexer holds but cannot open")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+
+	v, err := flags.open(ctx)
+	if err != nil {
+		return err
+	}
+	defer v.Close()
+
+	if *repack {
+		if err := reportRepack(ctx, v); err != nil {
+			return err
+		}
+	}
+
+	sweep, err := v.Reclaim(ctx)
+	if err != nil {
+		return err
+	}
+	fmt.Fprintf(stderr, "swept     %d object(s), deleted %d, released %d slab(s) in %s\n",
+		sweep.ObjectsSeen, sweep.ObjectsDeleted, sweep.SlabsReleased, took(sweep.Elapsed))
+	if sweep.Unreadable > 0 && !*unreadable {
+		fmt.Fprintf(stderr, "          %d object(s) cannot be opened; -unreadable removes them\n", sweep.Unreadable)
+	}
+
+	if *unreadable {
+		dropped, err := v.DropUnreadable(ctx)
+		if err != nil {
+			return err
+		}
+		fmt.Fprintf(stderr, "dropped   %d object(s) the indexer could not open\n", len(dropped))
+	}
+
+	freed := sweep.Freed()
+	before, after := sweep.Before, sweep.After
+	if *orphans {
+		found, err := v.Orphans(ctx)
+		if err != nil {
+			return err
+		}
+		var stranded int
+		for _, orphan := range found {
+			if !orphan.Tracked {
+				stranded++
+			}
+		}
+		fmt.Fprintf(stderr, "orphans   %d slab(s) hold nothing, %d of them unknown to this device\n",
+			len(found), stranded)
+
+		released, err := v.ReleaseOrphans(ctx)
+		if err != nil {
+			return err
+		}
+		fmt.Fprintf(stderr, "          released %d slab(s) in %s\n", released.SlabsReleased, took(released.Elapsed))
+		freed += released.Freed()
+		after = released.After
+	}
+
+	fmt.Fprintf(stderr, "quota     %s used before, %s after — freed %s\n",
+		humanBytes(before.PinnedData), humanBytes(after.PinnedData), humanBytes(freed))
+	return nil
+}
+
+func reportRepack(ctx context.Context, v *vault.Vault) error {
+	mark, err := v.Watermark(ctx)
+	if err != nil {
+		return err
+	}
+	if !mark.Affordable {
+		return fmt.Errorf("repack needs %s free to hold the old and new slabs at once, and there is less than that",
+			humanBytes(mark.Headroom))
+	}
+
+	packed, err := v.Repack(ctx)
+	if err != nil {
+		return err
+	}
+	if len(packed.Records) == 0 {
+		fmt.Fprint(stderr, "repack    nothing to move\n")
+		return nil
+	}
+	fmt.Fprintf(stderr, "repack    %d record(s), %d slab(s) into %d, peak %d, in %s\n",
+		len(packed.Records), packed.SlabsBefore, packed.SlabsAfter, packed.Peak, took(packed.Elapsed))
+	fmt.Fprintf(stderr, "          read %s · write %s · retire %s\n",
+		took(packed.ReadFor), took(packed.WriteFor), took(packed.RetireFor))
+	return nil
+}
+
+// runRecover rebuilds the vault from the recovery phrase and the indexer.
+func runRecover(ctx context.Context, args []string) error {
+	fs := flag.NewFlagSet("recover", flag.ExitOnError)
+	var flags vaultFlags
+	flags.bind(fs)
+	embed := fs.Bool("embed", true,
+		"regenerate search vectors as records are recovered, so they are findable by meaning and not only by id")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+
+	v, err := flags.open(ctx)
+	if err != nil {
+		return err
+	}
+	defer v.Close()
+
+	fmt.Fprint(stderr, "rebuilding from the recovery phrase and the indexer\n")
+	report, err := v.Recover(ctx, vault.RecoveryRequest{
+		Embed: *embed,
+		OnRecord: func(_ record.ID, n int) {
+			if n%100 == 0 {
+				fmt.Fprintf(stderr, "  %d records\n", n)
+			}
+		},
+	})
+	if err != nil {
+		return err
+	}
+	fmt.Fprintf(stderr, "recovered %d record(s) from %d object(s) in %s\n",
+		report.Recovered, report.Objects, took(report.Elapsed))
+	if report.Foreign > 0 {
+		fmt.Fprintf(stderr, "  skipped  %d frame(s) this phrase does not open\n", report.Foreign)
+	}
+	if report.Damaged > 0 || report.Unreadable > 0 {
+		fmt.Fprintf(stderr, "  damaged  %d object(s) stopped parsing part way, %d could not be opened at all\n",
+			report.Damaged, report.Unreadable)
+	}
+	return nil
+}

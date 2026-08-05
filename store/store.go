@@ -9,6 +9,14 @@ import (
 	"github.com/steven3002/mnemosia/sia"
 )
 
+// DefaultSlabPayloadSize is how many payload bytes one slab holds at the
+// default erasure coding, ten data shards of four MiB each.
+//
+// The live value is read from the SDK; this constant is for the offline case,
+// where nothing can be written anyway and the only thing that needs a number is
+// the queue's size ceiling.
+const DefaultSlabPayloadSize = 10 * 4 << 20
+
 // A Blob is one framed, sealed record on its way to storage.
 type Blob struct {
 	// CID is the keyed content address of the record body.

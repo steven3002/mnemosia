@@ -6,10 +6,37 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
-Pre-alpha. No release yet, the substrate library, MCP server, CLI and viewer are not implemented.
+Pre-alpha. No release yet. The storage substrate and a command-line interface over it exist; the MCP
+server and the viewer do not.
 
 ### Added
+- **Storage substrate.** Records are sealed on the device, batched, and written to Sia in shared
+  slabs. The write queue is held on disk, so a record that has been accepted but not yet written to
+  the network survives the process that accepted it, and an offline write is owed to the network
+  rather than silently kept local.
+- **Catalog as an append-only log with periodic snapshots**, compacted on a size ratio. Total bytes
+  written stay proportional to the number of records instead of to its square.
+- **Recovery from the recovery phrase and the indexer alone.** Every stored record carries its own
+  identity beside its ciphertext, so a vault that has lost its catalog can be rebuilt completely.
+  Damage is bounded: a truncated or corrupted object yields the records before the break, and the
+  authenticated envelope rejects anything that parses but is not what it claims to be.
+- **Three-tier reads** — the device's own copy, a cached storage location, and a cold fetch — with
+  every read counted by the tier that served it.
+- **Reclamation.** Storage that nothing points at is released, including storage stranded by an
+  installation that no longer exists. Repack rewrites live records into fewer slabs and runs only
+  when asked.
+- **Commands:** `init`, `remember`, `recall`, `flush`, `status`, `reclaim`, `recover`.
 - Project scaffolding: README, license, contribution guide, security policy, code of conduct.
+
+### Notes on behaviour worth knowing
+
+- **A saved record is not yet a stored record.** Writes are durable on the device immediately and
+  reach the network on a flush. Nothing in the interface conflates the two.
+- **Deleting a record frees no space by itself.** Records share a storage slab and a slab is billed
+  whole, so space returns when a slab has nothing live left in it and reclamation runs.
+- **Repack is manual.** It holds the old and new storage at the same time, and its behaviour under
+  concurrent writes and under interruption has not been measured, so nothing triggers it
+  automatically.
 
 ### Notes
 

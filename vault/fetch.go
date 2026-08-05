@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/steven3002/mnemosia/local"
 	"github.com/steven3002/mnemosia/manifest"
@@ -17,14 +18,20 @@ import (
 //
 // The order is not a cache hierarchy bolted on afterwards; the three sources
 // cost about an order of magnitude apart, and which one answered is the main
-// thing that explains a read's latency.
+// thing that explains a read's latency. Each is counted as it happens, because
+// the hit rates are a property of how the vault is used and cannot be worked
+// out later from anything else it stores.
 func (v *Vault) Fetch(ctx context.Context, id record.ID) (*record.Memory, recall.Tier, error) {
+	start := time.Now()
+
 	if body, err := v.local.GetBody(id); err == nil {
 		memory, err := record.Unmarshal(body)
+		v.countRead(recall.TierLocal, start)
 		return memory, recall.TierLocal, err
 	} else if !errors.Is(err, local.ErrNotFound) {
 		return nil, "", err
 	}
+	v.countMiss(recall.TierLocal)
 
 	entry, err := v.manifest.Lookup(id)
 	if err != nil {
@@ -55,36 +62,121 @@ func (v *Vault) Fetch(ctx context.Context, id record.ID) (*record.Memory, recall
 	if err := v.local.PutBody(id, entry.Kind, body); err != nil {
 		return nil, "", err
 	}
+	v.countRead(tier, start)
 	return memory, tier, nil
 }
 
 // fetchRemote reads a record's bytes from the network, using cached location
 // metadata when it is fresh enough to trust.
 func (v *Vault) fetchRemote(ctx context.Context, entry manifest.Entry, ref sia.ObjectRef) ([]byte, recall.Tier, error) {
-	cached, err := v.local.GetSlabMeta(entry.ObjectRef)
-	switch {
-	case err == nil && cached.Age() < v.opts.SlabMetaTTL:
-		payload, err := v.client.DownloadCached(sia.SlabMeta{Ref: ref, Bytes: cached.Meta})
-		if err == nil {
-			return payload, recall.TierCached, nil
-		}
-		// Fall through to the indexer: cached metadata that no longer works is
-		// exactly the case the expiry exists for.
-	case err != nil && !errors.Is(err, local.ErrNotFound):
+	if payload, ok, err := v.fetchCached(ctx, entry, ref); err != nil {
+		return nil, "", err
+	} else if ok {
+		return payload, recall.TierCached, nil
+	}
+	v.countMiss(recall.TierCached)
+
+	location, shared, err := v.client.LocationFor(ctx, ref)
+	if err != nil {
 		return nil, "", err
 	}
-
 	payload, err := v.client.Download(ctx, ref)
 	if err != nil {
 		return nil, "", err
 	}
-	if meta, err := v.client.SlabMetaFor(ctx, ref); err == nil {
-		if err := v.local.PutSlabMeta(entry.ObjectRef, entry.SlabID, meta.Bytes); err != nil {
-			return nil, "", err
-		}
+	if err := v.cacheLocation(location, shared); err != nil {
+		return nil, "", err
 	}
 	return payload, recall.TierNetwork, nil
 }
+
+// fetchCached tries the cached location, reporting whether it answered.
+//
+// Anything short of a clean success falls through to the indexer rather than
+// failing the read: metadata that has stopped working is exactly what the
+// expiry exists for, and the whole point of the tier is that missing it costs
+// latency and nothing else. A location that failed is dropped rather than left
+// to fail again on every subsequent read.
+func (v *Vault) fetchCached(ctx context.Context, entry manifest.Entry, ref sia.ObjectRef) ([]byte, bool, error) {
+	cached, err := v.local.GetLocation(entry.ObjectRef)
+	if errors.Is(err, local.ErrNotFound) {
+		return nil, false, nil
+	}
+	if err != nil {
+		return nil, false, err
+	}
+	if cached.Age() >= v.opts.SlabMetaTTL {
+		return nil, false, nil
+	}
+
+	shared := make(map[sia.SlabID][]byte, len(cached.SlabIDs))
+	slabIDs := make([]sia.SlabID, 0, len(cached.SlabIDs))
+	for _, slabID := range cached.SlabIDs {
+		slabIDs = append(slabIDs, sia.SlabID(slabID))
+		slab, err := v.local.GetSlabMeta(slabID)
+		if errors.Is(err, local.ErrNotFound) {
+			return nil, false, nil
+		}
+		if err != nil {
+			return nil, false, err
+		}
+		// The object's half and the slab's half expire independently, and the
+		// older of the two is what the read is actually trusting.
+		if slab.Age() >= v.opts.SlabMetaTTL {
+			return nil, false, nil
+		}
+		shared[sia.SlabID(slabID)] = slab.Meta
+	}
+
+	payload, err := v.client.DownloadAt(ctx, sia.Location{
+		Ref:   ref,
+		Slabs: slabIDs,
+		Bytes: cached.Meta,
+	}, shared)
+	if err != nil {
+		return nil, false, v.forgetLocation(cached)
+	}
+	return payload, true, nil
+}
+
+func (v *Vault) cacheLocation(location sia.Location, shared []sia.SlabLocation) error {
+	for _, slab := range shared {
+		if err := v.local.PutSlabMeta(string(slab.ID), slab.Bytes); err != nil {
+			return err
+		}
+	}
+	slabIDs := make([]string, len(location.Slabs))
+	for i, id := range location.Slabs {
+		slabIDs[i] = string(id)
+	}
+	return v.local.PutLocation(location.Ref.String(), slabIDs, location.Bytes)
+}
+
+func (v *Vault) forgetLocation(cached local.CachedLocation) error {
+	if err := v.local.ForgetLocation(cached.ObjectRef); err != nil {
+		return err
+	}
+	for _, slabID := range cached.SlabIDs {
+		if err := v.local.ForgetSlabMeta(slabID); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (v *Vault) countRead(tier recall.Tier, start time.Time) {
+	// A failure to count a read is not a reason to fail the read.
+	_ = v.local.RecordRead(string(tier), time.Since(start))
+}
+
+func (v *Vault) countMiss(tier recall.Tier) { _ = v.local.RecordMiss(string(tier)) }
+
+// ReadStats reports how each tier of the read hierarchy has performed over the
+// life of this vault, not just this process.
+func (v *Vault) ReadStats() ([]local.TierStat, error) { return v.local.ReadStats() }
+
+// CacheSize measures what the location cache costs on disk.
+func (v *Vault) CacheSize() (local.CacheSize, error) { return v.local.CacheSize() }
 
 // openBody unframes and decrypts one stored record, returning the exact bytes
 // that were sealed.
@@ -115,21 +207,10 @@ func (v *Vault) openPayload(id record.ID, payload []byte) (*record.Memory, error
 // FetchFromNetwork reads a record from Sia, bypassing this device's copy.
 //
 // It exists so a round trip can be checked against what was actually stored
-// rather than against what was written locally a moment earlier, the two are
+// rather than against what was written locally a moment earlier; the two are
 // only the same if the whole path works.
 func (v *Vault) FetchFromNetwork(ctx context.Context, id record.ID) (*record.Memory, error) {
-	if v.client == nil {
-		return nil, errOffline
-	}
-	entry, err := v.manifest.Lookup(id)
-	if err != nil {
-		return nil, err
-	}
-	ref, err := sia.ParseObjectRef(entry.ObjectRef)
-	if err != nil {
-		return nil, err
-	}
-	payload, err := v.client.Download(ctx, ref)
+	payload, err := v.StoredBytes(ctx, id)
 	if err != nil {
 		return nil, err
 	}
@@ -166,3 +247,7 @@ func (v *Vault) BodyFromNetwork(ctx context.Context, id record.ID) ([]byte, erro
 
 // LocalBody returns a record's bytes as this device holds them.
 func (v *Vault) LocalBody(id record.ID) ([]byte, error) { return v.local.GetBody(id) }
+
+// ForgetLocally drops this device's copy of a record without touching the
+// network, so a read can be forced down to the tiers below.
+func (v *Vault) ForgetLocally(id record.ID) error { return v.local.ForgetBody(id) }

@@ -16,6 +16,15 @@ type StoredVector struct {
 	Values []float32
 }
 
+// ForgetVector drops a record's embedding, so a forgotten record stops being
+// a candidate for recall.
+func (s *Store) ForgetVector(id record.ID) error {
+	if _, err := s.db.Exec(`DELETE FROM vectors WHERE record_id = ?`, id.String()); err != nil {
+		return fmt.Errorf("forget vector %s: %w", id, err)
+	}
+	return nil
+}
+
 // PutVector stores a record's embedding.
 //
 // The model name is stored beside the vector rather than assumed, so switching

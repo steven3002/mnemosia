@@ -76,6 +76,14 @@ func Open(ctx context.Context, opts Options) (*Vault, error) {
 			return nil, err
 		}
 	}
+	// The packer exists whether or not there is a connection. Offline it can
+	// only queue, but queueing is the part that must not be skipped: a record
+	// written with no connection is owed to the network exactly as much as one
+	// written with a connection, and the earlier design silently owed nothing.
+	if err := v.openPacker(); err != nil {
+		v.Close()
+		return nil, err
+	}
 	return v, nil
 }
 
@@ -100,7 +108,7 @@ func (v *Vault) openLocal(hierarchy keys.Hierarchy) error {
 	if err != nil {
 		return err
 	}
-	log, err := manifest.OpenLog(v.opts.manifestPath(), manifestSealer)
+	log, err := manifest.OpenLog(v.opts.manifestDir(), manifestSealer)
 	if err != nil {
 		return err
 	}
@@ -169,25 +177,58 @@ func (v *Vault) connect(ctx context.Context) error {
 	v.client = client
 	v.store = store.New(client)
 	v.reclaimer = reclaim.New(client, v.local)
+	_ = ctx
+	return nil
+}
 
+// openPacker prepares the write queue.
+//
+// The flush policy needs the slab size, which only the network knows, so an
+// offline vault falls back to the measured default. It affects nothing that
+// matters offline: the byte trigger is the one deadline that never fires in
+// practice, and a flush cannot happen without a connection anyway.
+func (v *Vault) openPacker() error {
 	policy := v.opts.Flush
 	if policy == (packer.Policy{}) {
-		slabBytes, err := v.store.SlabPayloadSize()
-		if err != nil {
-			return err
+		slabBytes := int64(store.DefaultSlabPayloadSize)
+		if v.store != nil {
+			measured, err := v.store.SlabPayloadSize()
+			if err != nil {
+				return err
+			}
+			slabBytes = measured
 		}
 		policy = packer.DefaultPolicy(slabBytes)
 	}
-	v.packer = packer.New(v.store, policy)
+
+	queue, err := packer.New(v.store, v.local, policy)
+	if err != nil {
+		return err
+	}
+	v.packer = queue
 	v.packer.OnFlush(v.recordFlush)
-	_ = ctx
 	return nil
+}
+
+// StartFlushing runs the flush deadlines in the background until the vault is
+// closed.
+//
+// It is opt-in because a short-lived command has nothing to gain from a timer:
+// it flushes explicitly, or leaves the queue for the next run. A long-running
+// host is the case the deadlines were written for.
+func (v *Vault) StartFlushing(ctx context.Context, onError func(error)) {
+	if v.packer != nil {
+		v.packer.Start(ctx, onError)
+	}
 }
 
 // Close releases everything the vault holds. Records still queued for a flush
 // stay on this device and are written by a later run.
 func (v *Vault) Close() error {
 	var errs []error
+	if v.packer != nil {
+		v.packer.Stop()
+	}
 	if v.manifest != nil {
 		errs = append(errs, v.manifest.Close())
 	}
@@ -240,6 +281,16 @@ func (v *Vault) Pending() int {
 		return 0
 	}
 	return v.packer.Pending()
+}
+
+// PendingBytes reports the sealed size of what is queued, counted as it will be
+// written: ciphertext with its envelope and framing, which is what a slab is
+// actually filled with.
+func (v *Vault) PendingBytes() int64 {
+	if v.packer == nil {
+		return 0
+	}
+	return v.packer.PendingBytes()
 }
 
 // Recall retrieves records by meaning.

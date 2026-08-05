@@ -22,4 +22,12 @@ type Entry struct {
 	Bytes     int         `json:"bytes,omitempty"`
 	Tags      []string    `json:"tags,omitempty"`
 	WrittenAt record.Time `json:"writtenAt"`
+	// Deleted marks a record the vault no longer holds.
+	//
+	// Removal is an append like every other change, because the catalog is a
+	// log: a line that says the record is gone is the only form of removal that
+	// survives a replay of the lines before it. The marker is kept rather than
+	// dropped at compaction, since a snapshot that forgot it would let the
+	// record come back the next time an older log was replayed over it.
+	Deleted bool `json:"deleted,omitempty"`
 }

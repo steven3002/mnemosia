@@ -79,11 +79,9 @@ func DefaultModelDir(home string) string {
 	return filepath.Join(home, "models")
 }
 
-// The names of the files a vault keeps under its home directory.
-const (
-	dbFile       = "vault.db"
-	manifestFile = "manifest.log"
-)
+// dbFile is the device's working copy. The catalog keeps its own files
+// alongside it.
+const dbFile = "vault.db"
 
 func (o *Options) applyDefaults() {
 	if o.Home == "" {
@@ -103,5 +101,5 @@ func (o *Options) applyDefaults() {
 	}
 }
 
-func (o *Options) dbPath() string       { return filepath.Join(o.Home, dbFile) }
-func (o *Options) manifestPath() string { return filepath.Join(o.Home, manifestFile) }
+func (o *Options) dbPath() string      { return filepath.Join(o.Home, dbFile) }
+func (o *Options) manifestDir() string { return o.Home }

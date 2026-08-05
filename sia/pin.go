@@ -3,6 +3,7 @@ package sia
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"go.sia.tech/core/types"
 	"go.sia.tech/indexd/slabs"
@@ -42,6 +43,15 @@ func (c *Client) PinSlabs(ctx context.Context, batch *Batch) error {
 	return nil
 }
 
+// PinConcurrency is how many object pins are in flight at once.
+//
+// Pinning is one indexer round trip per object and nothing else, so the wall
+// clock is latency, not work, and the only way to spend less of it is to
+// overlap. Measured throughput climbs steeply to this point and then flattens;
+// past it the extra requests buy nothing and only widen the blast radius of a
+// failure.
+const PinConcurrency = 16
+
 // PinObjects records each object's location with the indexer, making the batch
 // durable and retrievable by id.
 //
@@ -52,14 +62,27 @@ func (c *Client) PinObjects(ctx context.Context, batch *Batch) error {
 	if batch == nil || len(batch.objects) == 0 {
 		return nil
 	}
-	for i := range batch.objects {
+	return inFlight(ctx, len(batch.objects), PinConcurrency, func(ctx context.Context, i int) error {
 		sealed := batch.objects[i].Seal(c.appKey)
 		if err := c.app.PinObject(ctx, c.appKey, sealed.SealedObject); err != nil {
 			return fmt.Errorf("pin object %d of %d (%s): %w",
 				i+1, len(batch.objects), batch.placements[i].Ref, err)
 		}
-	}
-	return nil
+		return nil
+	})
+}
+
+// DeleteObjects removes a set of objects from the indexer.
+//
+// It frees nothing by itself; quota returns only when a slab has no live
+// objects left and is then unpinned. Doing it in that order is not a
+// preference: releasing a slab while objects still point into it leaves those
+// objects permanently unopenable, because their identity is derived from the
+// sectors that just went away.
+func (c *Client) DeleteObjects(ctx context.Context, refs []ObjectRef) error {
+	return inFlight(ctx, len(refs), PinConcurrency, func(ctx context.Context, i int) error {
+		return c.DeleteObject(ctx, refs[i])
+	})
 }
 
 // UnpinSlab releases a slab and returns its quota immediately.
@@ -67,27 +90,61 @@ func (c *Client) PinObjects(ctx context.Context, batch *Batch) error {
 // It goes around the SDK deliberately. The released SDK exposes only a prune
 // call that silently ignores anything younger than its own cutoff and offers no
 // way to override it, so an app built on the SDK alone cannot free recent
-// storage at all and is told it succeeded.
+// storage at all and is told it succeeded. Exposing this call was proposed
+// upstream and declined, so the detour is the long-term arrangement rather than
+// a stopgap.
+//
+// A slab that is already gone counts as success. The reason is not tidiness: the
+// indexer is expected to start releasing slabs by itself once their last object
+// is deleted, at which point this call becomes a second opinion on work already
+// done. Treating that as a failure would turn a working reclamation into a
+// reported error the day the service changes underneath us.
 func (c *Client) UnpinSlab(ctx context.Context, id SlabID) error {
 	slabID, err := parseSlabID(id)
 	if err != nil {
 		return err
 	}
 	if err := c.app.UnpinSlab(ctx, c.appKey, slabID); err != nil {
+		if isSlabGone(err) {
+			return nil
+		}
 		return fmt.Errorf("unpin slab %s: %w", id, err)
 	}
 	return nil
+}
+
+// isSlabGone recognises the indexer's absent-slab reply, by message because
+// that is all that survives the wire.
+func isSlabGone(err error) bool {
+	return err != nil && strings.Contains(err.Error(), slabs.ErrSlabNotFound.Error())
 }
 
 // DeleteObject removes an object's entry from the indexer.
 //
 // It frees nothing on its own: slabs are shared, so quota returns only when
 // every object over a slab is gone and the slab itself is unpinned.
+//
+// Deleting something that is already gone counts as success. Reclamation is
+// resumed after interruptions and run against a ledger that can be a step
+// behind the indexer, so the alternative is a sweep that cannot finish because
+// part of it finished last time.
 func (c *Client) DeleteObject(ctx context.Context, ref ObjectRef) error {
 	if err := c.sdk.DeleteObject(ctx, ref.ID); err != nil {
+		if isNotFound(err) {
+			return nil
+		}
 		return fmt.Errorf("delete object %s: %w", ref, err)
 	}
 	return nil
+}
+
+// isNotFound recognises the indexer's absent-object reply.
+//
+// It matches on the message because that is all that survives the wire: the
+// indexer's typed error is rendered into the response body and rebuilt by the
+// client as a plain error, so there is nothing to compare against.
+func isNotFound(err error) bool {
+	return err != nil && strings.Contains(err.Error(), slabs.ErrObjectNotFound.Error())
 }
 
 func parseSlabID(id SlabID) (slabs.SlabID, error) {

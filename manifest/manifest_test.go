@@ -12,7 +12,7 @@ import (
 	"github.com/steven3002/mnemosia/seal"
 )
 
-func openCatalog(t *testing.T, path string) *manifest.Manifest {
+func openCatalog(t *testing.T, dir string) *manifest.Manifest {
 	t.Helper()
 	hierarchy, err := keys.Derive(keys.Seed{7})
 	if err != nil {
@@ -22,7 +22,7 @@ func openCatalog(t *testing.T, path string) *manifest.Manifest {
 	if err != nil {
 		t.Fatalf("new sealer: %v", err)
 	}
-	log, err := manifest.OpenLog(path, sealer)
+	log, err := manifest.OpenLog(dir, sealer)
 	if err != nil {
 		t.Fatalf("open log: %v", err)
 	}
@@ -56,9 +56,9 @@ func entry(t *testing.T, ref string) manifest.Entry {
 }
 
 func TestAppendSurvivesAReopen(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "manifest.log")
+	dir := t.TempDir()
 
-	catalog := openCatalog(t, path)
+	catalog := openCatalog(t, dir)
 	first := entry(t, "aa")
 	second := entry(t, "bb")
 	for _, e := range []manifest.Entry{first, second} {
@@ -68,7 +68,7 @@ func TestAppendSurvivesAReopen(t *testing.T) {
 	}
 	catalog.Close()
 
-	reopened := openCatalog(t, path)
+	reopened := openCatalog(t, dir)
 	if reopened.Len() != 2 {
 		t.Fatalf("catalog holds %d entries after a reopen, want 2", reopened.Len())
 	}
@@ -84,7 +84,7 @@ func TestAppendSurvivesAReopen(t *testing.T) {
 // Repack rewrites object refs, so a later entry for one record has to win
 // without the record becoming two records.
 func TestAppendSupersedesAnEarlierLocation(t *testing.T) {
-	catalog := openCatalog(t, filepath.Join(t.TempDir(), "manifest.log"))
+	catalog := openCatalog(t, t.TempDir())
 
 	first := entry(t, "before-repack")
 	if err := catalog.Append(first); err != nil {
@@ -109,7 +109,7 @@ func TestAppendSupersedesAnEarlierLocation(t *testing.T) {
 }
 
 func TestLookupReportsAMissingRecord(t *testing.T) {
-	catalog := openCatalog(t, filepath.Join(t.TempDir(), "manifest.log"))
+	catalog := openCatalog(t, t.TempDir())
 	id, _ := record.NewID()
 	if _, err := catalog.Lookup(id); !errors.Is(err, manifest.ErrNotFound) {
 		t.Fatalf("lookup of an absent record returned %v", err)
@@ -119,13 +119,13 @@ func TestLookupReportsAMissingRecord(t *testing.T) {
 // The catalog names every record the vault holds, so it must not be readable
 // from disk.
 func TestLogIsEncryptedAtRest(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "manifest.log")
-	catalog := openCatalog(t, path)
+	dir := t.TempDir()
+	catalog := openCatalog(t, dir)
 	if err := catalog.Append(entry(t, "an-object-ref-worth-hiding")); err != nil {
 		t.Fatalf("append: %v", err)
 	}
 
-	raw, err := os.ReadFile(path)
+	raw, err := os.ReadFile(filepath.Join(dir, manifest.LogName))
 	if err != nil {
 		t.Fatalf("read log: %v", err)
 	}
