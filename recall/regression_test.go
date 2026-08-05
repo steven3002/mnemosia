@@ -13,6 +13,7 @@ import (
 
 	"github.com/steven3002/mnemosia/embed"
 	"github.com/steven3002/mnemosia/index"
+	"github.com/steven3002/mnemosia/local"
 	"github.com/steven3002/mnemosia/recall"
 	"github.com/steven3002/mnemosia/record"
 )
@@ -41,6 +42,8 @@ type harness struct {
 	// recovery is bounded by.
 	embedFor time.Duration
 	perDoc   time.Duration
+	// lexical is the shipped term index over the same corpus.
+	lexical *local.Store
 }
 
 // staticCatalog answers the ranking pipeline's questions from the fixture. The
@@ -60,6 +63,32 @@ type staticFetcher struct{ bodies map[record.ID]*record.Memory }
 
 func (f staticFetcher) Fetch(_ context.Context, id record.ID) (*record.Memory, recall.Tier, error) {
 	return f.bodies[id], recall.TierLocal, nil
+}
+
+// The lexical half of the ranking is measured through the shipped index rather
+// than through a reimplementation of it.
+//
+// Everything else in this harness is deliberately static, because a change in
+// hit@5 must be attributable to the ranker. The term index is the exception: it
+// *is* part of the ranker, and a second BM25 written for the harness would let
+// the product's own tokenizer, stopword policy and scoring drift without any
+// number here moving. It runs on a temporary database, so this still touches no
+// network and no vault.
+var lexicalDir string
+
+// TestMain owns the temporary database the lexical index lives in. The harness
+// is built once for the whole package, so its store has to outlive the first
+// test that asks for it, which rules out t.TempDir.
+func TestMain(m *testing.M) {
+	dir, err := os.MkdirTemp("", "mnemosia-recall-")
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "recall harness: %v\n", err)
+		os.Exit(1)
+	}
+	lexicalDir = dir
+	code := m.Run()
+	os.RemoveAll(dir)
+	os.Exit(code)
 }
 
 // The corpus is embedded once for the whole package.
@@ -131,6 +160,11 @@ func buildHarness() (*harness, string, error) {
 	}
 	fetcher := staticFetcher{bodies: make(map[record.ID]*record.Memory, len(f.Records))}
 
+	store, err := local.Open(filepath.Join(lexicalDir, "lexical.db"))
+	if err != nil {
+		return nil, "", fmt.Errorf("open lexical store: %w", err)
+	}
+
 	texts := make([]string, len(f.Records))
 	for i, r := range f.Records {
 		h.byHandle[r.ID] = r
@@ -146,7 +180,14 @@ func buildHarness() (*harness, string, error) {
 		if r.Supersedes != "" {
 			catalog.superseded[handleID(r.Supersedes)] = true
 		}
+		if err := store.PutRankingMeta(local.RankingMeta{
+			ID: memory.ID, Type: memory.Type, Tags: memory.Tags,
+			Text: local.LexicalText(memory),
+		}); err != nil {
+			return nil, "", fmt.Errorf("index %s lexically: %w", r.ID, err)
+		}
 	}
+	h.lexical = store
 
 	start := time.Now()
 	vectors, err := embedder.Embed(ctx, texts)
@@ -163,7 +204,7 @@ func buildHarness() (*harness, string, error) {
 		}
 		docVector[r.ID] = vectors[i]
 	}
-	h.pipeline = recall.New(embedder, idx, fetcher, catalog)
+	h.pipeline = recall.New(embedder, idx, fetcher, catalog, store)
 	if err := h.measureDensity(ctx, embedder, docVector); err != nil {
 		return nil, "", err
 	}
@@ -552,10 +593,12 @@ func countAnswerable(f fixture) int {
 
 // TestFilterWeightSweep is where the shipped weights come from.
 //
-// The spike that established soft filtering boosted reciprocal-rank-fusion
-// scores, whose spacing has nothing to do with cosine's, so its constant could
-// not be carried over — a number that means "half again" on one scale means
-// something else on another.
+// The weights are stated against whatever the ranker scores in, and that has
+// changed once already: these constants were an order of magnitude larger when
+// ranking was cosine alone, and had to be re-derived when rank fusion replaced
+// that scale. A number that means "half again" on one scale means something
+// else entirely on another, so the sweep is re-run rather than the constant
+// re-used.
 //
 // The weight is NOT chosen by maximising the score under a correct filter. That
 // number rises monotonically with the weight, and it rises because a large
@@ -600,12 +643,12 @@ func TestFilterWeightSweep(t *testing.T) {
 		base.hit(1), base.hit(3), base.hit(5), base.mrr())
 
 	for _, w := range []recall.Weights{
-		{Tag: 0.02, Type: 0.007},
-		{Tag: 0.06, Type: 0.02},
-		{Tag: 0.10, Type: 0.033},
-		{Tag: 0.20, Type: 0.067},
-		{Tag: 0.50, Type: 0.167},
-		{Tag: 1.00, Type: 0.333},
+		{Tag: 0.0005, Type: 0.00017},
+		{Tag: 0.001, Type: 0.00033},
+		{Tag: 0.002, Type: 0.00067},
+		{Tag: 0.004, Type: 0.0013},
+		{Tag: 0.008, Type: 0.0027},
+		{Tag: 0.02, Type: 0.0067},
 	} {
 		for _, agent := range agents {
 			m := aggregate(h.run(t, agent.name, func(q fixtureQuery) recall.Request {
@@ -616,6 +659,131 @@ func TestFilterWeightSweep(t *testing.T) {
 				m.hit(1), m.hit(3), m.hit(5), m.mrr())
 		}
 	}
+}
+
+// TestLexicalWeightSweep is where the shipped lexical weight comes from, and
+// the reason it is not the weight that maximises hit@5.
+//
+// The queries a term index helps and the queries that prove semantic recall are
+// disjoint. A query sharing no content word with its answer cannot be helped by
+// BM25 and is actively harmed by it, because BM25 still ranks something and
+// fusion still promotes what it ranks. Those queries are a minority of any
+// labelled set, so a weight tuned on the aggregate degrades them while the
+// average improves — which is the one outcome a memory store cannot accept,
+// since retrieving a record that shares no words with the question is the thing
+// it exists to do.
+//
+// So the two populations are reported separately and never as one number. The
+// criterion is the largest weight that costs the zero-overlap population
+// nothing.
+func TestLexicalWeightSweep(t *testing.T) {
+	h := newHarness(t)
+
+	zero := h.zeroOverlapQueries()
+	t.Logf("%d of %d answerable queries share no indexed term with any of their gold records",
+		len(zero), countAnswerable(h.fixture))
+	if len(zero) == 0 {
+		t.Skip("the corpus has no zero-lexical-overlap query, so the criterion cannot be applied")
+	}
+
+	only := func(want bool) func(outcome) bool {
+		return func(o outcome) bool { return zero[o.query.ID] == want }
+	}
+	t.Logf("%-12s | %6s %6s %6s %6s | %6s | %-13s | %-13s",
+		"lex weight", "hit@1", "hit@3", "hit@5", "hit@10", "MRR", "zero-overlap", "has-overlap")
+
+	for _, weight := range []float32{-1, 0.01, 0.02, 0.03, 0.05, 0.10, 0.50, 1.00} {
+		outcomes := h.run(t, "lexical", func(fixtureQuery) recall.Request {
+			return recall.Request{LexicalWeight: weight}
+		})
+		all := aggregate(outcomes)
+		z := aggregate(filterOutcomes(outcomes, only(true)))
+		n := aggregate(filterOutcomes(outcomes, only(false)))
+		label := fmt.Sprintf("%.3f", weight)
+		if weight < 0 {
+			label = "dense-only"
+		}
+		t.Logf("%-12s | %6.3f %6.3f %6.3f %6.3f | %6.3f | %6.3f (n=%2d) | %6.3f (n=%2d)",
+			label, all.hit(1), all.hit(3), all.hit(5), all.hit(10), all.mrr(),
+			z.hit(5), z.Queries, n.hit(5), n.Queries)
+	}
+}
+
+// The property the shipped weight was chosen for, enforced rather than logged.
+// A query whose answer shares no word with it must rank no worse under fusion
+// than it did under the vector pass alone.
+func TestFusionDoesNotDegradeSemanticOnlyQueries(t *testing.T) {
+	h := newHarness(t)
+
+	zero := h.zeroOverlapQueries()
+	if len(zero) == 0 {
+		t.Skip("the corpus has no zero-lexical-overlap query")
+	}
+	only := func(o outcome) bool { return zero[o.query.ID] }
+
+	dense := filterOutcomes(h.run(t, "dense-only", func(fixtureQuery) recall.Request {
+		return recall.Request{LexicalWeight: -1}
+	}), only)
+	shipped := filterOutcomes(h.run(t, "shipped", func(fixtureQuery) recall.Request {
+		return recall.Request{}
+	}), only)
+
+	base, fused := aggregate(dense), aggregate(shipped)
+	t.Logf("%d zero-overlap queries: hit@5 %.3f dense-only against %.3f fused, MRR %.3f against %.3f",
+		base.Queries, base.hit(5), fused.hit(5), base.mrr(), fused.mrr())
+	if fused.hit(5) < base.hit(5) {
+		t.Errorf("fusion cost the zero-lexical-overlap queries hit@5: %.3f against %.3f dense-only",
+			fused.hit(5), base.hit(5))
+	}
+}
+
+// zeroOverlapQueries names the queries no lexical pass can help: those where no
+// gold record shares a single indexed term with the query.
+func (h *harness) zeroOverlapQueries() map[string]bool {
+	out := map[string]bool{}
+	for _, q := range h.fixture.Queries {
+		if !q.Answerable() {
+			continue
+		}
+		terms := map[string]bool{}
+		for _, term := range local.Terms(q.Query) {
+			terms[term] = true
+		}
+		overlap := false
+		for _, handle := range q.Gold {
+			gold := h.byHandle[handle]
+			memory := &record.Memory{
+				Statement: gold.Statement, Context: gold.Context, Tags: gold.Tags,
+			}
+			for _, term := range local.Terms(local.LexicalText(memory)) {
+				if terms[term] {
+					overlap = true
+					break
+				}
+			}
+			if overlap {
+				break
+			}
+		}
+		out[q.ID] = !overlap
+	}
+	// Only the zero-overlap ones are of interest; the rest are noise here.
+	for id, isZero := range out {
+		if !isZero {
+			delete(out, id)
+		}
+	}
+	return out
+}
+
+func filterOutcomes(outcomes []outcome, keep func(outcome) bool) []outcome {
+	var out []outcome
+	for _, o := range outcomes {
+		if keep(o) {
+			out = append(out, o)
+		}
+	}
+	return out
 }
 
 // The floor soft filtering exists to provide: however wrong the filter, the

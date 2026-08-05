@@ -44,8 +44,9 @@ func runRecall(ctx context.Context, args []string) error {
 		return err
 	}
 
-	fmt.Fprintf(stderr, "  embed %s · search %s over %d vector(s) · fetch %s\n",
-		took(result.EmbedFor), took(result.SearchFor), result.Searched, took(result.FetchFor))
+	fmt.Fprintf(stderr, "  embed %s · search %s over %d vector(s) and %d term match(es) · fetch %s\n",
+		took(result.EmbedFor), took(result.SearchFor), result.Searched,
+		result.LexicalHits, took(result.FetchFor))
 	if result.SupersededHidden > 0 {
 		fmt.Fprintf(stderr, "  %d superseded version(s) held back; -history returns them\n",
 			result.SupersededHidden)
@@ -69,9 +70,14 @@ func runRecall(ctx context.Context, args []string) error {
 			}
 			memory, source, elapsed = fetched, "network", time.Since(start)
 		}
-		fmt.Printf("%d. [%.4f] %s\n", n+1, hit.Score, memory.Statement)
-		if hit.Boost > 0 {
-			fmt.Printf("   similarity %.4f + filter %.4f\n", hit.Similarity, hit.Boost)
+		// The leading number is similarity, not the score the record was ranked
+		// on. Ranking fuses two passes and the fused score is in units of rank,
+		// so it is meaningful only against the other hits in this list and would
+		// read as a uniformly terrible match if printed. Similarity is the one
+		// number here that means the same thing every time it is shown.
+		fmt.Printf("%d. [%.4f] %s\n", n+1, hit.Similarity, memory.Statement)
+		if why := ranked(hit); why != "" {
+			fmt.Printf("   %s\n", why)
 		}
 		if memory.Context != "" {
 			fmt.Printf("   context: %s\n", memory.Context)
@@ -83,4 +89,27 @@ func runRecall(ctx context.Context, args []string) error {
 		fmt.Printf(" · from %s in %s\n", source, took(elapsed))
 	}
 	return nil
+}
+
+// ranked names the signals beyond similarity that put a record where it is, so
+// a caller can tell a record found by meaning from one found by its words or
+// promoted by the filter it supplied.
+func ranked(hit recall.Hit) string {
+	var why []string
+	if hit.Lexical > 0 {
+		why = append(why, "words it shares with the query")
+	}
+	if hit.Boost > 0 {
+		why = append(why, "the tags and types asked for")
+	}
+	if len(why) == 0 {
+		return ""
+	}
+	// A record the vector pass never scored has no similarity to report, and
+	// printing the zero it carries would read as "no relation to the query".
+	prefix := "also ranked up by "
+	if hit.Similarity == 0 {
+		prefix = "found only by "
+	}
+	return prefix + strings.Join(why, " and ")
 }

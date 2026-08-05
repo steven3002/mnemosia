@@ -34,5 +34,6 @@ func rankingMeta(memory *record.Memory) local.RankingMeta {
 		Type:       memory.Type,
 		Tags:       memory.Tags,
 		Supersedes: memory.Supersedes,
+		Text:       local.LexicalText(memory),
 	}
 }

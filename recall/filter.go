@@ -33,39 +33,53 @@ func (f Filter) Empty() bool { return len(f.Types) == 0 && len(f.Tags) == 0 }
 
 // Weights set how far a filter may move a record.
 //
-// They are additive on the cosine scale the index scores in, so a boost is
-// commensurable with a similarity difference and can be reasoned about: a tag
-// weight of 0.05 says "carrying every requested tag is worth as much as five
-// hundredths of cosine similarity". A multiplicative form was rejected because
-// cosine can be negative, where multiplying by more than one demotes.
+// They are additive on the rank-fusion scale the pipeline ranks in, so a boost
+// is commensurable with a difference in rank and can be reasoned about in those
+// terms: with the fusion constant at 60, one position near the top of the pool
+// is worth about 0.00026, and the whole hundred-record pool spans about 0.010.
+// A tag weight of 0.004 therefore says "carrying every requested tag is worth
+// about fifteen places". A multiplicative form was rejected because it would
+// scale the gap between ranks rather than move a record across it.
 type Weights struct {
 	Tag  float32
 	Type float32
 }
 
-// DefaultWeights are the shipped weights, measured on the regression corpus.
+// DefaultWeights are the shipped weights, measured on the labelled corpus.
 //
-// They were not carried over from the spike that established filtering works:
-// that spike boosted reciprocal-rank-fusion scores, whose spacing has nothing to
-// do with cosine's, so its constant would have meant something else here.
+// They are stated against the fused score and not against cosine. Ranking used
+// to be cosine alone, and these constants were an order of magnitude larger to
+// suit it; fusion replaced that scale with one whose whole pool spans about
+// 0.010, where the old tag weight of 0.20 was twenty times the entire spread.
+// A boost that large does not prefer a record, it guarantees it — which is hard
+// filtering under another name, and hard filtering is the thing measured to
+// return nothing at all for a sixth of queries when a single tag is wrong.
+// Carrying the old constants across the scale change would have converted soft
+// filtering into the failure mode it exists to avoid.
 //
-// Nor were they chosen by maximising the score under a correct filter. That
-// number rises monotonically with the weight, and it rises for a bad reason — a
-// large enough boost swamps similarity entirely, which is hard filtering under
-// another name. The criterion is instead the largest boost that still costs a
-// *wrong* filter nothing, since surviving a wrong filter is the entire reason
-// soft filtering exists.
+// The criterion is unchanged, and it is not maximising the score under a correct
+// filter: that number rises with the weight for the same bad reason. It is the
+// largest boost that still costs a *wrong* filter nothing, since surviving a
+// wrong filter is the entire point.
 //
-// Measured across three agent qualities (TestFilterWeightSweep): at this weight
-// a correct filter takes hit@5 from 0.950 to 1.000 and MRR from 0.883 to 0.963,
-// while a filter with every tag wrong scores 0.950 / 0.883 — the unfiltered
-// baseline exactly. At 0.50 the wrong filter's MRR falls to 0.858, below
-// baseline, and at 1.00 it collapses to 0.475. The harm begins between the two.
+// Measured across three agent qualities on two labelled corpora, and the weight
+// is the largest that costs a wrong filter nothing on *both*. On the 59-query
+// corpus a correct filter takes hit@5 from 0.847 to 0.898 and MRR from 0.745 to
+// 0.788, while a filter with one tag replaced scores 0.898 / 0.764 and a wholly
+// wrong one scores the unfiltered baseline exactly. Doubling the weight is free
+// on that corpus but not on the 20-query one, where a wholly wrong filter starts
+// costing 5 points of hit@1; the two corpora disagree, so the lower of the two
+// answers is the one that ships.
+//
+// Weight is not what limits filtering here. Doubling again reaches 0.932 with a
+// correct filter, and quadrupling reaches 1.000 on the smaller corpus — both by
+// letting a wrong filter do real damage, which is the trade soft filtering
+// exists to refuse.
 //
 // The 3:1 ratio between the tag and type weights was held fixed through the
 // sweep rather than optimised on its own; it reflects that tags discriminate
 // more than types, which was measured separately, not here.
-var DefaultWeights = Weights{Tag: 0.20, Type: 0.067}
+var DefaultWeights = Weights{Tag: 0.002, Type: 0.00067}
 
 func (w Weights) orDefault() Weights {
 	if w == (Weights{}) {

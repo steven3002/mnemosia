@@ -123,7 +123,9 @@ var RecallTool = Tool{
 Search the user's vault by meaning and return the records most likely to answer the question.
 
 Pass the user's actual question as the query, in their words. Do not reduce it to keywords: the
-search is semantic, and a question retrieves better than the nouns extracted from it.
+search ranks mostly by meaning and only partly by matching words, so a whole question retrieves
+better than the nouns extracted from it — and the words are still there for the part that wants
+them.
 
 ALWAYS supply tags and types when you can infer them from the question. They are the difference
 between finding the answer and returning five near misses, and in a vault where most records concern

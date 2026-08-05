@@ -21,6 +21,17 @@ type RankingMeta struct {
 	// names it here. That keeps the vault append-only, since marking the older
 	// record would mean rewriting an immutable body.
 	Supersedes *record.ID
+	// Text is what the lexical pass indexes. An empty value leaves the record
+	// reachable by meaning but not by its words, which is a degraded ranking and
+	// never a missing record.
+	Text string
+}
+
+// execer is the part of a transaction the metadata writers use, so the helpers
+// that write to more than one table can be called from a single transaction
+// instead of opening their own.
+type execer interface {
+	Exec(query string, args ...any) (sql.Result, error)
 }
 
 // NormalizeTag puts a tag in the one form the vault compares.
@@ -73,6 +84,11 @@ func (s *Store) PutRankingMeta(meta RankingMeta) error {
 			return fmt.Errorf("record tag %q on %s: %w", tag, meta.ID, err)
 		}
 	}
+	// In the same transaction as the rest, so no reader ever sees a record that
+	// one half of ranking knows about and the other does not.
+	if err := putLexical(tx, meta.ID, meta.Text); err != nil {
+		return err
+	}
 	return tx.Commit()
 }
 
@@ -89,6 +105,9 @@ func (s *Store) ForgetRankingMeta(id record.ID) error {
 	}
 	if _, err := tx.Exec(`DELETE FROM record_meta WHERE record_id = ?`, id.String()); err != nil {
 		return fmt.Errorf("forget metadata %s: %w", id, err)
+	}
+	if err := forgetLexical(tx, id); err != nil {
+		return err
 	}
 	return tx.Commit()
 }

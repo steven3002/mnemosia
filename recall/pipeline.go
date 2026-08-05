@@ -46,16 +46,36 @@ type Described struct {
 }
 
 // A Pipeline runs a query from text to ranked records.
+//
+// Three signals decide the order, and they compose in this order and no other:
+//
+//  1. the vector pass retrieves the candidate pool and ranks it by meaning;
+//  2. the lexical pass reranks that pool by the words the query used, fused with
+//     the vector ranking by weighted reciprocal rank fusion;
+//  3. the metadata filter boosts what the caller said it was looking for.
+//
+// Fusion sits beneath the filter because the two answer different questions.
+// Fusion decides which records best match the query as asked; the filter
+// expresses a preference about the answer that the query text does not carry.
+// Applying the filter first would mean fusing a ranking the caller had already
+// perturbed, and the lexical pass would be reranking a pool ordered partly by
+// something it knows nothing about.
 type Pipeline struct {
 	embedder *embed.Embedder
 	index    *index.Index
 	fetcher  Fetcher
 	catalog  Catalog
+	lexical  Lexical
 }
 
-// New builds a pipeline over an embedder, an index, a fetcher and a catalog.
-func New(embedder *embed.Embedder, idx *index.Index, fetcher Fetcher, catalog Catalog) *Pipeline {
-	return &Pipeline{embedder: embedder, index: idx, fetcher: fetcher, catalog: catalog}
+// New builds a pipeline over an embedder, an index, a fetcher, a catalog and a
+// lexical index.
+//
+// A nil lexical index is allowed and leaves the ranking dense-only. That is a
+// worse ranking, not a broken one, and it is what a vault opened before the
+// lexical index existed has until it is rebuilt.
+func New(embedder *embed.Embedder, idx *index.Index, fetcher Fetcher, catalog Catalog, lexical Lexical) *Pipeline {
+	return &Pipeline{embedder: embedder, index: idx, fetcher: fetcher, catalog: catalog, lexical: lexical}
 }
 
 // A Request is one recall.
@@ -67,6 +87,10 @@ type Request struct {
 	// Weights override how far the filter may move a record. The zero value
 	// means the shipped defaults.
 	Weights Weights
+	// LexicalWeight overrides how much say the lexical pass gets. The zero
+	// value means DefaultLexicalWeight; a negative value disables the lexical
+	// pass and ranks on meaning alone.
+	LexicalWeight float32
 	// IncludeSuperseded returns replaced versions alongside current ones.
 	//
 	// Default recall answers with the vault's current state, which is what
@@ -92,6 +116,10 @@ type Result struct {
 	Searched int
 	// Considered is how many candidates the filter reordered.
 	Considered int
+	// LexicalHits is how many records the term pass matched. Zero means the
+	// query shared no indexed word with anything in the vault, and the ranking
+	// is the vector pass's alone.
+	LexicalHits int
 	// SupersededHidden is how many replaced versions were held back.
 	SupersededHidden int
 }
@@ -142,13 +170,20 @@ func (p *Pipeline) Run(ctx context.Context, req Request) (Result, error) {
 	if err != nil {
 		return Result{}, err
 	}
-	known, err := p.describe(matches)
+	weight := lexicalWeight(req)
+	lexical, err := p.searchLexical(req.Query, pool, weight)
 	if err != nil {
 		return Result{}, err
 	}
-	ranked, hidden := rank(matches, known, req, limit)
+	fused := fuse(matches, lexical, weight)
+	known, err := p.describe(fused)
+	if err != nil {
+		return Result{}, err
+	}
+	ranked, hidden := rank(fused, known, req, limit)
 	result.SearchFor = time.Since(start)
-	result.Considered = len(matches)
+	result.Considered = len(fused)
+	result.LexicalHits = len(lexical)
 	result.SupersededHidden = hidden
 
 	start = time.Now()
@@ -162,6 +197,7 @@ func (p *Pipeline) Run(ctx context.Context, req Request) (Result, error) {
 			Memory:     memory,
 			Score:      match.Score,
 			Similarity: match.Similarity,
+			Lexical:    match.Lexical,
 			Boost:      match.Boost,
 			Tier:       tier,
 			FetchedIn:  time.Since(fetchedAt),
@@ -173,28 +209,66 @@ func (p *Pipeline) Run(ctx context.Context, req Request) (Result, error) {
 
 // A candidate is one record on its way to being ranked.
 type candidate struct {
-	ID         record.ID
-	Score      float32
+	ID record.ID
+	// Score is what the order is decided on: the fused rank score plus whatever
+	// the filter added.
+	Score float32
+	// Similarity is the vector pass's own cosine, carried through unchanged so a
+	// caller can still see how close the record sits to the query. It is
+	// reported, never ranked on, once fusion has run.
 	Similarity float32
-	Boost      float32
+	// Fused is the rank-fusion score before the filter touched it, and Lexical
+	// is the part of it the lexical pass contributed.
+	Fused   float32
+	Lexical float32
+	Boost   float32
+}
+
+// lexicalWeight resolves how much say the lexical pass gets for one request.
+//
+// A negative weight is how a caller asks for the vector pass alone; zero is the
+// unset value and means the shipped default, because a Request literal that does
+// not mention fusion must get the shipped ranking.
+func lexicalWeight(req Request) float32 {
+	if req.LexicalWeight == 0 {
+		return DefaultLexicalWeight
+	}
+	if req.LexicalWeight < 0 {
+		return 0
+	}
+	return req.LexicalWeight
+}
+
+// searchLexical runs the term pass, tolerating its absence.
+//
+// A vault whose lexical index is missing or empty ranks on meaning alone rather
+// than failing: half a ranking is a worse answer, and no answer at all is not
+// one. A caller who has asked for no lexical contribution is not charged for the
+// query either, so ranking by meaning alone costs what it did before there was
+// a second pass.
+func (p *Pipeline) searchLexical(query string, k int, weight float32) ([]record.ID, error) {
+	if p.lexical == nil || weight == 0 {
+		return nil, nil
+	}
+	return p.lexical.SearchLexical(query, k)
 }
 
 // describe asks the catalog about the candidate pool, tolerating its absence.
-func (p *Pipeline) describe(matches []index.Match) (Described, error) {
-	if p.catalog == nil || len(matches) == 0 {
+func (p *Pipeline) describe(fused []candidate) (Described, error) {
+	if p.catalog == nil || len(fused) == 0 {
 		return Described{}, nil
 	}
-	ids := make([]record.ID, len(matches))
-	for i, match := range matches {
-		ids[i] = match.ID
+	ids := make([]record.ID, len(fused))
+	for i, entry := range fused {
+		ids[i] = entry.ID
 	}
 	return p.catalog.Describe(ids)
 }
 
-// rank orders the candidate pool and cuts it to k.
+// rank applies the filter to the fused pool and cuts it to k.
 //
 // The filter is applied here and nowhere else, as an addition to a score. The
-// length of what this returns is min(k, len(matches)) whatever the filter says —
+// length of what this returns is min(k, len(fused)) whatever the filter says —
 // that is the property which makes a wrong filter cost ranking quality instead
 // of the answer, and it is the one thing about this function that must not
 // change.
@@ -206,19 +280,18 @@ func (p *Pipeline) describe(matches []index.Match) (Described, error) {
 //
 // It is a free function rather than a method so that it can be exercised without
 // an embedder, an index or a network.
-func rank(matches []index.Match, known Described, req Request, k int) ([]candidate, int) {
+func rank(fused []candidate, known Described, req Request, k int) ([]candidate, int) {
 	weights := req.Weights.orDefault()
-	scored := make([]candidate, 0, len(matches))
+	scored := make([]candidate, 0, len(fused))
 	var hidden int
 
-	for _, match := range matches {
-		if !req.IncludeSuperseded && known.Superseded[match.ID] {
+	for _, entry := range fused {
+		if !req.IncludeSuperseded && known.Superseded[entry.ID] {
 			hidden++
 			continue
 		}
-		entry := candidate{ID: match.ID, Score: match.Score, Similarity: match.Score}
 		if !req.Filter.Empty() {
-			if meta, ok := known.Meta[match.ID]; ok {
+			if meta, ok := known.Meta[entry.ID]; ok {
 				entry.Boost = req.Filter.boost(weights, meta)
 				entry.Score += entry.Boost
 			}

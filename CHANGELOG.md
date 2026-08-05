@@ -29,6 +29,16 @@ server and the viewer do not.
   *prefer* matching records; they never exclude any. A tag guessed wrongly costs a little ranking
   quality and nothing else, which is deliberate — as an exclusion, one wrong tag was measured
   returning nothing at all for a sixth of queries.
+- **Hybrid ranking: a full-text index beside the vector one.** Three signals decide the order, in
+  one stated sequence — the vector pass ranks the candidate pool by meaning, a BM25 pass reranks it
+  by the words the query used, and the metadata filter boosts what the caller asked for. The two
+  passes are combined by weighted rank fusion, so no score scale has to be reconciled between them,
+  and a record either pass found on its own still ranks.
+  The lexical weight is small on purpose. It was chosen as the largest value that costs a query
+  sharing *no* word with its answer nothing at all — the case a memory store exists for, and the one
+  a term index cannot help and can actively harm. Measured against that criterion, the lexical pass
+  buys precision near the top of the list (hit@1 0.627 → 0.678) rather than a better hit@5, and the
+  configuration that ships outranks giving the two passes an equal vote on every metric measured.
 - **Context is required on every record**, and a record without it is rejected rather than stored
   with a default. It is the single largest measured contributor to whether a record can be found
   again, and records are immutable, so a missing context cannot be repaired afterwards.

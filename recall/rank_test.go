@@ -14,15 +14,23 @@ func id(t *testing.T, b byte) record.ID {
 	return out
 }
 
-// pool builds a descending-similarity candidate list, which is what the index
-// hands ranking.
-func pool(t *testing.T, n int) []index.Match {
+// matches builds a descending-similarity candidate list, which is what the
+// index hands the pipeline.
+func matches(t *testing.T, n int) []index.Match {
 	t.Helper()
 	out := make([]index.Match, n)
 	for i := range out {
 		out[i] = index.Match{ID: id(t, byte(i+1)), Score: float32(1.0 - 0.01*float64(i))}
 	}
 	return out
+}
+
+// pool is what the filter actually sees: the fused pool, here with no lexical
+// hits, so the order is the vector pass's own and these tests measure the filter
+// and nothing else.
+func pool(t *testing.T, n int) []candidate {
+	t.Helper()
+	return fuse(matches(t, n), nil, DefaultLexicalWeight)
 }
 
 // The property the whole design rests on. A filter may reorder; it may never

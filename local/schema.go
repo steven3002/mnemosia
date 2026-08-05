@@ -48,6 +48,22 @@ var schema = []string{
 		PRIMARY KEY (record_id, tag)
 	)`,
 	`CREATE INDEX IF NOT EXISTS record_tags_by_tag ON record_tags(tag)`,
+	// The lexical half of ranking: one full-text index over the terms of every
+	// record, scored with BM25 and fused with the vector pass.
+	//
+	// It holds the same plaintext the bodies table already holds, so it widens
+	// nothing: this file is the one place plaintext lives, and whatever protects
+	// the working copy protects this. What it adds is a second way to reach a
+	// record — by the words it uses rather than by what it means — which is the
+	// half a vector pass cannot do.
+	//
+	// record_id is UNINDEXED because it is carried, not searched: matching
+	// happens on terms alone, and an indexed id column would put record handles
+	// into the term dictionary.
+	`CREATE VIRTUAL TABLE IF NOT EXISTS record_lexical USING fts5(
+		record_id UNINDEXED,
+		terms
+	)`,
 	// Location metadata is split in two, because the two halves have wildly
 	// different multiplicities. The sector list and coding parameters are
 	// identical for every object packed into one slab and run to several

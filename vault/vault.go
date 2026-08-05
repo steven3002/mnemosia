@@ -358,7 +358,7 @@ func (v *Vault) PendingBytes() int64 {
 
 // Recall retrieves records by meaning.
 func (v *Vault) Recall(ctx context.Context, req recall.Request) (recall.Result, error) {
-	return recall.New(v.embedder, v.index, v, v).Run(ctx, req)
+	return recall.New(v.embedder, v.index, v, v, v.local).Run(ctx, req)
 }
 
 var errOffline = errors.New("vault is open offline")
