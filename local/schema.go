@@ -29,8 +29,12 @@ var schema = []string{
 	// Deliberately NOT keyed to bodies with a cascade. Dropping the local copy
 	// of a record is how the lower read tiers are reached at all; the record is
 	// still on the network and still has to rank.
+	// kind separates the record classes that share this address space. It is
+	// not a second tag: ranking uses it as an explicit scope a caller selects,
+	// where type and tags are preferences a caller guesses at.
 	`CREATE TABLE IF NOT EXISTS record_meta (
 		record_id  TEXT PRIMARY KEY,
+		kind       TEXT NOT NULL DEFAULT 'memory',
 		type       TEXT NOT NULL,
 		supersedes TEXT,
 		created_at TEXT NOT NULL
@@ -120,10 +124,52 @@ var schema = []string{
 		claimed_by TEXT
 	)`,
 	`CREATE INDEX IF NOT EXISTS queue_by_seq ON queue(seq)`,
+	// Session heads, held apart from the bodies table because the two are read
+	// in completely different ways. A body is fetched one at a time by id; a
+	// head is listed a thousand at a time, sorted and filtered, and the whole
+	// point of the session shape is that listing never touches a transcript.
+	// The listing columns are therefore denormalised out of the head so that a
+	// list reads them and nothing else.
+	//
+	// A head is the one record that changes after it is written, which is why
+	// it lives here and not in a slab: slabs hold immutable content, and a
+	// record rewritten on every turn would strand a copy of itself in one on
+	// every write.
+	`CREATE TABLE IF NOT EXISTS session_heads (
+		session_id  TEXT PRIMARY KEY,
+		version     INTEGER NOT NULL,
+		title       TEXT NOT NULL,
+		summary     TEXT NOT NULL DEFAULT '',
+		kind        TEXT NOT NULL,
+		project     TEXT NOT NULL DEFAULT '',
+		agent       TEXT NOT NULL DEFAULT '',
+		parent      TEXT,
+		created_at  TEXT NOT NULL,
+		updated_at  TEXT NOT NULL,
+		archived    INTEGER NOT NULL DEFAULT 0,
+		messages    INTEGER NOT NULL DEFAULT 0,
+		chunks      INTEGER NOT NULL DEFAULT 0,
+		bytes       INTEGER NOT NULL DEFAULT 0,
+		head        BLOB NOT NULL
+	)`,
+	`CREATE INDEX IF NOT EXISTS session_heads_by_updated ON session_heads(updated_at DESC)`,
+	// Sub-agent runs are found from their parent rather than by scanning, since
+	// loading a session with its children is the ordinary case and a scan of
+	// every session in the vault is not.
+	`CREATE INDEX IF NOT EXISTS session_heads_by_parent ON session_heads(parent)`,
 	`CREATE TABLE IF NOT EXISTS meta (
 		key   TEXT PRIMARY KEY,
 		value TEXT NOT NULL
 	)`,
+}
+
+// columnAdditions are columns added to tables that existed before them.
+//
+// SQLite has no "add column if absent", and a vault written by an earlier build
+// is a file on somebody's disk rather than something that can be recreated, so
+// the presence of each one is checked before it is added.
+var columnAdditions = []struct{ table, column, definition string }{
+	{"record_meta", "kind", "TEXT NOT NULL DEFAULT 'memory'"},
 }
 
 func (s *Store) migrate() error {
@@ -132,5 +178,36 @@ func (s *Store) migrate() error {
 			return fmt.Errorf("statement %d: %w", i+1, err)
 		}
 	}
+	for _, addition := range columnAdditions {
+		present, err := s.hasColumn(addition.table, addition.column)
+		if err != nil {
+			return err
+		}
+		if present {
+			continue
+		}
+		if _, err := s.db.Exec(
+			`ALTER TABLE ` + addition.table + ` ADD COLUMN ` + addition.column + ` ` + addition.definition); err != nil {
+			return fmt.Errorf("add %s.%s: %w", addition.table, addition.column, err)
+		}
+	}
 	return nil
+}
+
+func (s *Store) hasColumn(table, column string) (bool, error) {
+	rows, err := s.db.Query(`SELECT name FROM pragma_table_info(?)`, table)
+	if err != nil {
+		return false, fmt.Errorf("inspect %s: %w", table, err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err != nil {
+			return false, fmt.Errorf("inspect %s: %w", table, err)
+		}
+		if name == column {
+			return true, nil
+		}
+	}
+	return false, rows.Err()
 }

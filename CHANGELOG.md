@@ -55,6 +55,29 @@ server and the viewer do not.
 - **A recall regression suite** over a small committed corpus, reporting hit@k and mean reciprocal
   rank on every run, alongside two axes that an aggregate hides: how crowded each query's
   neighbourhood is, and which part of the vault its answers live in.
+- **Sessions: a small head plus ordered, immutable chunks.** A conversation is stored as a head — its
+  title, summary, tags, project, counts and lineage — that names the transcript without containing
+  it. Measured, a four-hundred-turn conversation is a **1,119-byte head over 809 KiB of transcript**,
+  and a thousand heads list in a few milliseconds while reading no transcripts at all. Appending
+  writes new chunks and rewrites only the head, so the cost of a turn is the size of the turn rather
+  than the size of the conversation, and no chunk that already exists is ever touched again.
+- **A portable message format, chosen by intersection rather than invented.** Content is an ordered
+  list of typed parts and never a flat string; a tool call and its result carry the same explicit
+  correlation id, so the link survives however the turns are interleaved; and every provider field
+  this format has no name for is carried through untouched and comes back byte for byte. Those three
+  are what five independent vendors agree on, and the first is what the existing cross-agent
+  converters concede they lose.
+- **Sessions and memories cross-reference each other.** A memory extracted from a conversation
+  records the session and the exact turns it came from; the conversation records the memories it
+  produced. One step from a fact to the exchange that produced it, in either direction.
+- **Sub-agent conversations are separate records with a containment edge**, and loading a session
+  names them without opening them unless it is asked to. A delegated run can be as large as the
+  conversation that delegated it.
+- **Conversations rank beside memories in one list, and a caller can address one class explicitly.**
+  The class selector is deliberately a different thing from the metadata filter: a filter is a guess
+  about what an answer will be about and must never cost an answer, while asking for sessions is a
+  statement about what is being looked at and is honoured exactly, with the count of what it set
+  aside reported alongside.
 - **Commands:** `init`, `remember`, `recall`, `flush`, `status`, `reclaim`, `recover`.
 - Project scaffolding: README, license, contribution guide, security policy, code of conduct.
 
@@ -73,6 +96,19 @@ server and the viewer do not.
   figures below say which case they describe.
 - **Recovering a vault re-derives every vector**, at roughly 0.45 s per record, so a large vault
   takes a while to become searchable again after a recovery. The records themselves come back first.
+- **Only a conversation's summary is searched, never its transcript.** Embedding every message of a
+  long conversation is a large cost for a poor result — transcripts are mostly filler and tool
+  output — so a session is found by its title, summary and tags. The transcript is always there to
+  be read; it is not what the search reads.
+- **A conversation's transcript is on the network; the head that names it is on the device.** The
+  head changes every time the conversation is added to, and storage here holds immutable content, so
+  the two live in different places. A vault rebuilt from the network alone currently recovers the
+  transcripts and not the records naming them.
+- **A saved conversation is subject to the same flush window as anything else, and this is
+  deliberate.** Forcing a write to the network on every append would bill a whole storage slab per
+  turn — measured, forty mebibytes for a transcript of under a kilobyte — so a long conversation
+  would consume a large fraction of a free account for a few hundred kilobytes of text. Saving
+  reports plainly whether the network has it yet, and a caller who wants it written now can say so.
 
 ### Notes
 

@@ -27,3 +27,39 @@ func Unmarshal(b []byte) (*Memory, error) {
 	}
 	return &m, nil
 }
+
+// MarshalSession renders a session head as the canonical stored form.
+func MarshalSession(s *Session) ([]byte, error) {
+	b, err := json.Marshal(s)
+	if err != nil {
+		return nil, fmt.Errorf("marshal session %s: %w", s.ID, err)
+	}
+	return b, nil
+}
+
+// UnmarshalSession reads a stored session head.
+func UnmarshalSession(b []byte) (*Session, error) {
+	var s Session
+	if err := json.Unmarshal(b, &s); err != nil {
+		return nil, fmt.Errorf("unmarshal session: %w", err)
+	}
+	return &s, nil
+}
+
+// MarshalChunk renders a transcript chunk as the canonical stored form.
+func MarshalChunk(c *Chunk) ([]byte, error) {
+	b, err := json.Marshal(c)
+	if err != nil {
+		return nil, fmt.Errorf("marshal chunk %s: %w", c.ID, err)
+	}
+	return b, nil
+}
+
+// UnmarshalChunk reads a stored transcript chunk.
+func UnmarshalChunk(b []byte) (*Chunk, error) {
+	var c Chunk
+	if err := json.Unmarshal(b, &c); err != nil {
+		return nil, fmt.Errorf("unmarshal chunk: %w", err)
+	}
+	return &c, nil
+}

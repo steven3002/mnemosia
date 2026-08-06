@@ -22,9 +22,44 @@ const (
 	TierNetwork Tier = "network"
 )
 
+// A Found is the record a hit resolved to. Exactly one field is set.
+//
+// It is a struct rather than an interface because the two record classes have
+// nothing in common beyond an id: a memory is a proposition, a session is the
+// head of a conversation, and the caller wants whichever it got rather than a
+// lowest common denominator of both.
+type Found struct {
+	Memory  *record.Memory
+	Session *record.Session
+}
+
+// Kind reports which class of record was found.
+func (f Found) Kind() record.Kind {
+	switch {
+	case f.Memory != nil:
+		return record.KindMemory
+	case f.Session != nil:
+		return record.KindSession
+	default:
+		return ""
+	}
+}
+
+// ID reports the found record's id.
+func (f Found) ID() record.ID {
+	switch {
+	case f.Memory != nil:
+		return f.Memory.ID
+	case f.Session != nil:
+		return f.Session.ID
+	default:
+		return record.ID{}
+	}
+}
+
 // A Hit is one recalled record with the evidence for why it was returned.
 type Hit struct {
-	Memory *record.Memory
+	Found
 	// Score is what the record was ranked on: the fused rank score of the vector
 	// and lexical passes, plus any boost.
 	//

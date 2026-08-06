@@ -3,44 +3,38 @@ package vault_test
 import (
 	"context"
 	"fmt"
-	"os"
-	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/steven3002/mnemosia/embed"
+	"github.com/steven3002/mnemosia/embed/embedtest"
 	"github.com/steven3002/mnemosia/recall"
 	"github.com/steven3002/mnemosia/record"
 	"github.com/steven3002/mnemosia/vault"
 )
 
-// modelDirEnv points at an already-downloaded model. Nothing here downloads
-// one: an ordinary test run touches no network.
-const modelDirEnv = "MNEMOSIA_MODELS"
-
 const testPhrase = "abandon abandon abandon abandon abandon abandon " +
 	"abandon abandon abandon abandon abandon about"
 
-// offlineVault opens a vault with the real embedder and no network.
+// offlineVault opens a vault with no network and no model.
 //
-// Offline is the right shape for measuring the write path: S2 measured the
-// device write at 398 ms/record and found it was almost entirely embedding, so
-// what matters is what the device does before the network is involved at all.
+// Almost everything here is about what the vault does with a vector rather than
+// about which vector it is — that a record is searchable the moment it is
+// written, that a supersession hides the record it replaced, that a restatement
+// is recognised, that the index survives a restart. None of that is a property
+// of the embedding model, and loading one for it costs three quarters of a
+// gigabyte in a package that runs beside others.
 func offlineVault(t *testing.T) *vault.Vault {
 	t.Helper()
-	root := os.Getenv(modelDirEnv)
-	if root == "" {
-		root = filepath.Join(os.Getenv("HOME"), ".cache", "mnemosia", "models")
-	}
-	if !embed.BGESmallEN.Present(root) {
-		t.Skipf("embedding model is not present under %s; set %s to run the write-path measurement",
-			root, modelDirEnv)
-	}
+	return openVault(t, t.TempDir(), embedtest.NewStub())
+}
 
+func openVault(t *testing.T, home string, embedder embed.Vectorizer) *vault.Vault {
+	t.Helper()
 	v, err := vault.Open(context.Background(), vault.Options{
-		Home:     t.TempDir(),
+		Home:     home,
 		Phrase:   testPhrase,
-		ModelDir: root,
+		Embedder: embedder,
 		Offline:  true,
 	})
 	if err != nil {
@@ -48,6 +42,21 @@ func offlineVault(t *testing.T) *vault.Vault {
 	}
 	t.Cleanup(func() { v.Close() })
 	return v
+}
+
+// modelVault opens a vault with the real embedder, for the one measurement
+// whose whole subject is what embedding costs.
+//
+// It takes the shared model slot, so this package and the recall regression
+// never hold a model at the same time.
+func modelVault(t *testing.T) *vault.Vault {
+	t.Helper()
+	embedder, release, err := embedtest.OpenModel(context.Background())
+	if err != nil {
+		t.Skipf("%v", err)
+	}
+	t.Cleanup(release)
+	return openVault(t, t.TempDir(), embedder)
 }
 
 func write(t *testing.T, v *vault.Vault, n int, tags []string) vault.RememberResult {
@@ -71,7 +80,9 @@ func write(t *testing.T, v *vault.Vault, n int, tags []string) vault.RememberRes
 // over vectors already in memory, and a tag-frequency lookup — so the figure to
 // report is what those cost on top.
 func TestWritePathStaysInteractive(t *testing.T) {
-	v := offlineVault(t)
+	// The real model, because the whole claim is a ratio against what embedding
+	// costs and a stub would put the numerator over nothing.
+	v := modelVault(t)
 
 	const records = 25
 	var embedFor, sealFor, adviseFor, total time.Duration
@@ -100,25 +111,13 @@ func TestWritePathStaysInteractive(t *testing.T) {
 // Recall has to see a record the moment the write returns, and it has to still
 // see it after the process that wrote it is gone.
 func TestAWrittenRecordIsSearchableAndSurvivesAReopen(t *testing.T) {
-	root := os.Getenv(modelDirEnv)
-	if root == "" {
-		root = filepath.Join(os.Getenv("HOME"), ".cache", "mnemosia", "models")
-	}
-	if !embed.BGESmallEN.Present(root) {
-		t.Skipf("embedding model is not present under %s", root)
-	}
 	home := t.TempDir()
 	ctx := context.Background()
-
-	open := func() *vault.Vault {
-		v, err := vault.Open(ctx, vault.Options{
-			Home: home, Phrase: testPhrase, ModelDir: root, Offline: true,
-		})
-		if err != nil {
-			t.Fatalf("open vault: %v", err)
-		}
-		return v
-	}
+	// One embedder across both opens, because the claim under test is that the
+	// vectors outlive the vault and a second embedder would make it the weaker
+	// claim that they can be recomputed.
+	embedder := embedtest.NewStub()
+	open := func() *vault.Vault { return openVault(t, home, embedder) }
 
 	first := open()
 	stored := write(t, first, 1, []string{"tidepool", "stations"})

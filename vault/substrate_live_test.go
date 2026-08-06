@@ -708,12 +708,12 @@ func TestLiveReadHierarchyAndStaleCache(t *testing.T) {
 	}
 
 	start = time.Now()
-	memory, tier, err := v.Fetch(ctx, stale.ID)
+	found, tier, err := v.Fetch(ctx, stale.ID)
 	refetch := time.Since(start)
 	if err != nil {
 		t.Fatalf("a stale cached location failed the read instead of falling back: %v", err)
 	}
-	if memory == nil {
+	if found.Memory == nil {
 		t.Fatal("the re-fetch returned no record")
 	}
 	if tier != recall.TierNetwork {

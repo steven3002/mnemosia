@@ -61,10 +61,31 @@ func runRecall(ctx context.Context, args []string) error {
 	}
 
 	for n, hit := range result.Hits {
-		memory, source, elapsed := hit.Memory, string(hit.Tier), hit.FetchedIn
+		source, elapsed := string(hit.Tier), hit.FetchedIn
+		if session := hit.Session; session != nil {
+			// A session ranks beside memories and is rendered differently,
+			// because what a caller wants from one is different: a memory is an
+			// answer, a session is somewhere to go and look.
+			fmt.Printf("%d. [%.4f] %s\n", n+1, hit.Similarity, session.Title)
+			if why := ranked(hit); why != "" {
+				fmt.Printf("   %s\n", why)
+			}
+			if session.Summary != "" {
+				fmt.Printf("   summary: %s\n", session.Summary)
+			}
+			fmt.Printf("   %s · session · %d message(s) in %d chunk(s)",
+				session.ID, session.Counts.Messages, len(session.Chunks))
+			if len(session.Tags) > 0 {
+				fmt.Printf(" · %s", strings.Join(session.Tags, ", "))
+			}
+			fmt.Printf(" · from %s in %s\n", source, took(elapsed))
+			continue
+		}
+
+		memory := hit.Memory
 		if *fromNetwork {
 			start := time.Now()
-			fetched, err := v.FetchFromNetwork(ctx, memory.ID)
+			fetched, err := v.FetchMemoryFromNetwork(ctx, memory.ID)
 			if err != nil {
 				return err
 			}

@@ -94,6 +94,9 @@ func (w Weights) orDefault() Weights {
 // point of holding an index — so anything the ordering depends on has to be
 // available here rather than on the record itself.
 type Meta struct {
+	// Kind is the record's class. It is what a scope selects on, and it is
+	// never an input to the boost: a class is a container, not a preference.
+	Kind record.Kind
 	Type record.Type
 	Tags []string
 }

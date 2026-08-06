@@ -10,6 +10,11 @@ const (
 	// KindSession is a conversation head plus immutable chunks, retrieved by
 	// metadata and version.
 	KindSession Kind = "session"
+	// KindChunk is an immutable ordered slice of a session's transcript. It is
+	// a record of its own so that appending to a conversation never rewrites
+	// what was already stored, and so that a transcript can be read a piece at
+	// a time.
+	KindChunk Kind = "chunk"
 )
 
 // A Type classifies a memory record. The vocabulary is closed: soft metadata

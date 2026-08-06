@@ -37,6 +37,16 @@ type Options struct {
 	Model embed.Model
 	// ModelDir is where model files live.
 	ModelDir string
+	// Embedder supplies vectors instead of loading a model from ModelDir.
+	//
+	// The vault takes its model identity from whatever is supplied here, since
+	// a vector and the model that produced it are a pair and the vault stamps
+	// every vector with the model's name so a later mismatch is detectable.
+	//
+	// Closing it stays with whoever opened it: a model is expensive enough that
+	// it is normally shared across several vaults, and a vault that closed
+	// something it did not open would take the others down with it.
+	Embedder embed.Vectorizer
 	// Flush decides when queued records are written to the network.
 	Flush packer.Policy
 	// SlabMetaTTL bounds how long cached object locations are trusted. Past it

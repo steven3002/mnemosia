@@ -111,6 +111,9 @@ func (v *Vault) recoverFrame(ctx context.Context, frame seal.Frame, object sia.S
 		// records by the phrase, and the two are not the same secret.
 		return false, err
 	}
+	if frame.Kind == record.KindChunk {
+		return false, v.recoverChunk(frame, object, body)
+	}
 	memory, err := record.Unmarshal(body)
 	if err != nil {
 		return false, fmt.Errorf("record %s: %w", frame.ID, err)
@@ -164,4 +167,43 @@ func (v *Vault) recoverFrame(ctx context.Context, frame seal.Frame, object sia.S
 		return false, err
 	}
 	return true, nil
+}
+
+// recoverChunk restores one transcript chunk.
+//
+// A chunk carries no vector and no ranking metadata: it is never searched, and
+// the summary that is searched lives on the head. The head itself is not
+// recoverable this way at all — it is the one record that is never packed into a
+// slab, so a vault rebuilt from the indexer alone gets its transcripts back and
+// not the sessions that name them. Each chunk records the session it belongs to,
+// so what a rebuild recovers is enough to reconstruct a head, which nothing does
+// yet.
+func (v *Vault) recoverChunk(frame seal.Frame, object sia.StoredObject, body []byte) error {
+	chunk, err := record.UnmarshalChunk(body)
+	if err != nil {
+		return fmt.Errorf("chunk %s: %w", frame.ID, err)
+	}
+	if chunk.ID != frame.ID {
+		return fmt.Errorf("chunk %s: the stored blob identifies itself as %s", chunk.ID, frame.ID)
+	}
+	if err := v.local.PutBody(frame.ID, frame.Kind, body); err != nil {
+		return err
+	}
+	cid, err := v.sealer.CID(body)
+	if err != nil {
+		return err
+	}
+	if err := v.manifest.Append(manifest.Entry{
+		ID:        frame.ID,
+		Kind:      frame.Kind,
+		Version:   1,
+		CID:       cid,
+		ObjectRef: object.Ref.String(),
+		SlabID:    string(object.Slab),
+		Bytes:     len(frame.Sealed),
+		WrittenAt: record.Now(),
+	}); err != nil {
+		return err
+	}
+	return v.reclaimer.Track(object.Slab, 1, int64(len(frame.Sealed)))
 }

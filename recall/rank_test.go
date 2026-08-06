@@ -176,9 +176,9 @@ func TestSupersededRecordsAreHiddenByDefaultAndReachableOnRequest(t *testing.T) 
 	replaced := candidates[0].ID
 	known := Described{Superseded: map[record.ID]bool{replaced: true}}
 
-	current, hidden := rank(candidates, known, Request{}, 6)
-	if hidden != 1 {
-		t.Fatalf("hid %d records, want 1", hidden)
+	current, dropped := rank(candidates, known, Request{}, 6)
+	if dropped.superseded != 1 {
+		t.Fatalf("hid %d records, want 1", dropped.superseded)
 	}
 	for _, hit := range current {
 		if hit.ID == replaced {
@@ -186,9 +186,9 @@ func TestSupersededRecordsAreHiddenByDefaultAndReachableOnRequest(t *testing.T) 
 		}
 	}
 
-	history, hiddenNow := rank(candidates, known, Request{IncludeSuperseded: true}, 6)
-	if hiddenNow != 0 {
-		t.Fatalf("hid %d records when history was asked for", hiddenNow)
+	history, droppedNow := rank(candidates, known, Request{IncludeSuperseded: true}, 6)
+	if droppedNow.superseded != 0 {
+		t.Fatalf("hid %d records when history was asked for", droppedNow.superseded)
 	}
 	var found bool
 	for _, hit := range history {

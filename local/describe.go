@@ -38,21 +38,21 @@ func (s *Store) Describe(ids []record.ID) (Described, error) {
 	placeholders := strings.TrimSuffix(strings.Repeat("?,", len(ids)), ",")
 
 	rows, err := s.db.Query(
-		`SELECT record_id, type FROM record_meta WHERE record_id IN (`+placeholders+`)`, args...)
+		`SELECT record_id, kind, type FROM record_meta WHERE record_id IN (`+placeholders+`)`, args...)
 	if err != nil {
 		return Described{}, fmt.Errorf("describe candidates: %w", err)
 	}
 	defer rows.Close()
 	for rows.Next() {
-		var idHex, kind string
-		if err := rows.Scan(&idHex, &kind); err != nil {
+		var idHex, kind, recordType string
+		if err := rows.Scan(&idHex, &kind, &recordType); err != nil {
 			return Described{}, fmt.Errorf("scan candidate: %w", err)
 		}
 		id, err := record.ParseID(idHex)
 		if err != nil {
 			return Described{}, err
 		}
-		out.Meta[id] = RankingMeta{ID: id, Type: record.Type(kind)}
+		out.Meta[id] = RankingMeta{ID: id, Kind: record.Kind(kind), Type: record.Type(recordType)}
 	}
 	if err := rows.Err(); err != nil {
 		return Described{}, err

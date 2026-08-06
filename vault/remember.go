@@ -65,6 +65,9 @@ type RememberResult struct {
 	// Tags reports how well the supplied tags separate this record from the rest
 	// of the vault.
 	Tags TagAdvice
+	// LinkedSession is the conversation this memory was recorded against, when
+	// the write named one. The edge now exists in both directions.
+	LinkedSession *record.ID
 
 	// EmbedFor, SealFor and FlushFor are what the write actually spent.
 	EmbedFor time.Duration
@@ -171,6 +174,22 @@ func (v *Vault) Remember(ctx context.Context, req RememberRequest) (RememberResu
 		return RememberResult{}, err
 	}
 	result.FlushFor = time.Since(start)
+
+	// A memory that names the conversation it came from is recorded on that
+	// conversation too. Both directions are stored because both are asked, and
+	// the reverse edge has no other home: a session that had to scan every
+	// memory in the vault to find the ones it produced would make the
+	// interesting question the expensive one.
+	if memory.Source.SessionID != "" {
+		sessionID, err := record.ParseID(memory.Source.SessionID)
+		if err != nil {
+			return RememberResult{}, fmt.Errorf("memory %s source: %w", id, err)
+		}
+		if err := v.LinkMemory(sessionID, id); err != nil {
+			return RememberResult{}, err
+		}
+		result.LinkedSession = &sessionID
+	}
 
 	start = time.Now()
 	if result.Neighbours, err = v.neighbours(ctx, id, vector); err != nil {

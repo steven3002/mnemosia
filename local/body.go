@@ -40,6 +40,25 @@ func (s *Store) GetBody(id record.ID) ([]byte, error) {
 	return body, nil
 }
 
+// GetRecord reads a record body together with the kind that says how to parse
+// it.
+//
+// The kind is stored beside the body rather than inferred from it, because the
+// three record classes are all JSON and a tolerant decoder will happily read one
+// as another and produce a well-formed record of the wrong shape.
+func (s *Store) GetRecord(id record.ID) (record.Kind, []byte, error) {
+	var kind string
+	var body []byte
+	err := s.db.QueryRow(`SELECT kind, body FROM bodies WHERE record_id = ?`, id.String()).Scan(&kind, &body)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", nil, fmt.Errorf("body %s: %w", id, ErrNotFound)
+	}
+	if err != nil {
+		return "", nil, fmt.Errorf("read body %s: %w", id, err)
+	}
+	return record.Kind(kind), body, nil
+}
+
 // ForgetBody drops this device's copy of a record.
 //
 // The record itself is untouched: it is on the network, the catalog still

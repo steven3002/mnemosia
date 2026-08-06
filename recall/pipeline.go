@@ -6,10 +6,18 @@ import (
 	"sort"
 	"time"
 
-	"github.com/steven3002/mnemosia/embed"
 	"github.com/steven3002/mnemosia/index"
 	"github.com/steven3002/mnemosia/record"
 )
+
+// An Embedder turns a query into a vector.
+//
+// Ranking asks for one vector per recall and nothing else, so this is stated as
+// the one method rather than as the whole embedder: it keeps the pipeline
+// buildable — and testable — without a model resident in the process.
+type Embedder interface {
+	EmbedOne(ctx context.Context, text string) ([]float32, error)
+}
 
 // A Fetcher resolves a record id to its decrypted body.
 //
@@ -17,7 +25,7 @@ import (
 // comes from, this device, a cached location, or the network, stays behind
 // this one method.
 type Fetcher interface {
-	Fetch(ctx context.Context, id record.ID) (*record.Memory, Tier, error)
+	Fetch(ctx context.Context, id record.ID) (Found, Tier, error)
 }
 
 // A Catalog answers the questions ranking must settle before it fetches
@@ -61,7 +69,7 @@ type Described struct {
 // perturbed, and the lexical pass would be reranking a pool ordered partly by
 // something it knows nothing about.
 type Pipeline struct {
-	embedder *embed.Embedder
+	embedder Embedder
 	index    *index.Index
 	fetcher  Fetcher
 	catalog  Catalog
@@ -74,7 +82,7 @@ type Pipeline struct {
 // A nil lexical index is allowed and leaves the ranking dense-only. That is a
 // worse ranking, not a broken one, and it is what a vault opened before the
 // lexical index existed has until it is rebuilt.
-func New(embedder *embed.Embedder, idx *index.Index, fetcher Fetcher, catalog Catalog, lexical Lexical) *Pipeline {
+func New(embedder Embedder, idx *index.Index, fetcher Fetcher, catalog Catalog, lexical Lexical) *Pipeline {
 	return &Pipeline{embedder: embedder, index: idx, fetcher: fetcher, catalog: catalog, lexical: lexical}
 }
 
@@ -82,6 +90,24 @@ func New(embedder *embed.Embedder, idx *index.Index, fetcher Fetcher, catalog Ca
 type Request struct {
 	Query string
 	Limit int
+	// Scope selects which classes of record may answer. Empty means all of
+	// them, which is the default and is what makes one ranked list possible.
+	//
+	// This is a hard selector and it is deliberately not the same mechanism as
+	// Filter. The two answer different questions. A filter is a guess about
+	// what the answer will be *about* — an agent infers tags and types from the
+	// wording of a question, gets some of them wrong, and must never lose an
+	// answer for it; that is why filtering only ever prefers. A scope is a
+	// statement about which container is being addressed, made explicitly by a
+	// caller who is not guessing: "list my sessions" is a different operation
+	// from a question whose phrasing happens to suggest a type, and answering
+	// the first with memories is simply the wrong answer.
+	//
+	// Nothing derives a scope from the query text. The moment it were inferred
+	// it would be a guess, and a hard selector applied to a guess is exactly the
+	// mechanism that was measured returning nothing at all for a sixth of
+	// queries.
+	Scope []record.Kind
 	// Filter prefers some records over others. It never removes any.
 	Filter Filter
 	// Weights override how far the filter may move a record. The zero value
@@ -122,6 +148,12 @@ type Result struct {
 	LexicalHits int
 	// SupersededHidden is how many replaced versions were held back.
 	SupersededHidden int
+	// ScopeExcluded is how many candidates the scope removed. It is reported
+	// rather than left silent because a scope is the one thing in this pipeline
+	// that can shorten an answer, and a caller who selected the wrong container
+	// should be able to see that from the result instead of inferring it from
+	// an empty list.
+	ScopeExcluded int
 }
 
 const (
@@ -180,21 +212,22 @@ func (p *Pipeline) Run(ctx context.Context, req Request) (Result, error) {
 	if err != nil {
 		return Result{}, err
 	}
-	ranked, hidden := rank(fused, known, req, limit)
+	ranked, dropped := rank(fused, known, req, limit)
 	result.SearchFor = time.Since(start)
 	result.Considered = len(fused)
 	result.LexicalHits = len(lexical)
-	result.SupersededHidden = hidden
+	result.SupersededHidden = dropped.superseded
+	result.ScopeExcluded = dropped.outOfScope
 
 	start = time.Now()
 	for _, match := range ranked {
 		fetchedAt := time.Now()
-		memory, tier, err := p.fetcher.Fetch(ctx, match.ID)
+		found, tier, err := p.fetcher.Fetch(ctx, match.ID)
 		if err != nil {
 			return Result{}, fmt.Errorf("recall %s: %w", match.ID, err)
 		}
 		result.Hits = append(result.Hits, Hit{
-			Memory:     memory,
+			Found:      found,
 			Score:      match.Score,
 			Similarity: match.Similarity,
 			Lexical:    match.Lexical,
@@ -265,6 +298,12 @@ func (p *Pipeline) describe(fused []candidate) (Described, error) {
 	return p.catalog.Describe(ids)
 }
 
+// dropped counts the candidates that did not reach the ranking, by reason.
+type dropped struct {
+	superseded int
+	outOfScope int
+}
+
 // rank applies the filter to the fused pool and cuts it to k.
 //
 // The filter is applied here and nowhere else, as an addition to a score. The
@@ -273,28 +312,32 @@ func (p *Pipeline) describe(fused []candidate) (Described, error) {
 // of the answer, and it is the one thing about this function that must not
 // change.
 //
-// Supersession is the single thing that does drop a candidate, and it is not an
-// exception to the rule above. It is a statement about which version of a record
-// is current, decided by the vault's own history, not a guess about relevance
-// supplied by a caller who may be wrong about it.
+// Exactly two things drop a candidate, and neither is a guess about relevance.
+// Supersession is a statement about which version of a record is current,
+// decided by the vault's own history. Scope is a statement about which class of
+// record the caller is addressing, made explicitly rather than inferred. Both
+// are counted and reported.
 //
 // It is a free function rather than a method so that it can be exercised without
 // an embedder, an index or a network.
-func rank(fused []candidate, known Described, req Request, k int) ([]candidate, int) {
+func rank(fused []candidate, known Described, req Request, k int) ([]candidate, dropped) {
 	weights := req.Weights.orDefault()
 	scored := make([]candidate, 0, len(fused))
-	var hidden int
+	var counts dropped
 
 	for _, entry := range fused {
 		if !req.IncludeSuperseded && known.Superseded[entry.ID] {
-			hidden++
+			counts.superseded++
 			continue
 		}
-		if !req.Filter.Empty() {
-			if meta, ok := known.Meta[entry.ID]; ok {
-				entry.Boost = req.Filter.boost(weights, meta)
-				entry.Score += entry.Boost
-			}
+		meta, described := known.Meta[entry.ID]
+		if len(req.Scope) > 0 && !inScope(req.Scope, meta.Kind, described) {
+			counts.outOfScope++
+			continue
+		}
+		if !req.Filter.Empty() && described {
+			entry.Boost = req.Filter.boost(weights, meta)
+			entry.Score += entry.Boost
 		}
 		scored = append(scored, entry)
 	}
@@ -309,5 +352,28 @@ func rank(fused []candidate, known Described, req Request, k int) ([]candidate, 
 	if len(scored) > k {
 		scored = scored[:k]
 	}
-	return scored, hidden
+	return scored, counts
+}
+
+// inScope reports whether a candidate belongs to one of the selected classes.
+//
+// A candidate this device holds no metadata for is out of scope rather than in
+// it. That is the opposite of how the soft filter treats the same gap, and
+// deliberately: a filter that cannot read a record's tags has no evidence and
+// must not act, whereas a scope that cannot read a record's class cannot honour
+// what the caller explicitly asked for, and returning the wrong class of record
+// is a worse answer than returning one fewer. Every candidate reaches the index
+// and the metadata in one transaction, so this is a corrupted invariant rather
+// than an ordinary state, and it is counted where an ordinary state would not
+// be.
+func inScope(scope []record.Kind, kind record.Kind, described bool) bool {
+	if !described {
+		return false
+	}
+	for _, want := range scope {
+		if want == kind {
+			return true
+		}
+	}
+	return false
 }

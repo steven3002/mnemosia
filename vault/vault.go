@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"sync/atomic"
 	"time"
 
 	"github.com/steven3002/mnemosia/embed"
@@ -32,13 +33,24 @@ type Vault struct {
 	local     *local.Store
 	manifest  *manifest.Manifest
 	index     *index.Index
-	embedder  *embed.Embedder
+	embedder  embed.Vectorizer
 	client    *sia.Client
 	store     *store.Store
 	packer    *packer.Packer
 	reclaimer *reclaim.Reclaimer
 	vectors   *index.Store
 	health    IndexHealth
+	// ownsEmbedder records whether this vault loaded the model itself, which is
+	// what decides whether closing the vault may close it.
+	ownsEmbedder bool
+	sessionStats sessionCounters
+}
+
+// sessionCounters are read counts a session claim is asserted against.
+type sessionCounters struct {
+	HeadReads  atomic.Int64
+	ChunkReads atomic.Int64
+	ChunkBytes atomic.Int64
 }
 
 // Open prepares a vault for use.
@@ -143,16 +155,10 @@ func (v *Vault) checkPhrase(hierarchy keys.Hierarchy) error {
 }
 
 func (v *Vault) openIndex(ctx context.Context) error {
-	dir, err := v.opts.Model.Fetch(ctx, v.opts.ModelDir)
-	if err != nil {
+	if err := v.openEmbedder(ctx); err != nil {
 		return err
 	}
-	embedder, err := embed.Open(ctx, v.opts.Model, dir)
-	if err != nil {
-		return err
-	}
-	v.embedder = embedder
-	v.index = index.New(v.opts.Model.Name, embedder.Dim())
+	v.index = index.New(v.opts.Model.Name, v.opts.Model.Dim)
 
 	vectors, err := index.OpenStore(v.opts.indexDir(), v.sealer)
 	if err != nil {
@@ -164,13 +170,40 @@ func (v *Vault) openIndex(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	usable, health := classifyVectors(v.opts.Model.Name, embedder.Dim(), stored)
+	usable, health := classifyVectors(v.opts.Model.Name, v.opts.Model.Dim, stored)
 	for _, vector := range usable {
 		if err := v.index.Add(vector.ID, vector.Model, vector.Vector); err != nil {
 			return err
 		}
 	}
 	v.health = health
+	return nil
+}
+
+// openEmbedder settles which model this vault embeds with.
+//
+// A supplied embedder wins and its identity replaces the configured one, so the
+// name stamped on every vector is always the name of what produced it. Silently
+// keeping the configured name would put two models' vectors in one index under
+// one label, which is the single failure the model stamp exists to make
+// visible.
+func (v *Vault) openEmbedder(ctx context.Context) error {
+	if v.opts.Embedder != nil {
+		v.embedder = v.opts.Embedder
+		v.opts.Model = v.opts.Embedder.Model()
+		return nil
+	}
+	v.ownsEmbedder = true
+	dir, err := v.opts.Model.Fetch(ctx, v.opts.ModelDir)
+	if err != nil {
+		return err
+	}
+	embedder, err := embed.Open(ctx, v.opts.Model, dir)
+	if err != nil {
+		return err
+	}
+	v.embedder = embedder
+	v.opts.Model.Dim = embedder.Dim()
 	return nil
 }
 
@@ -284,28 +317,40 @@ func (v *Vault) StartFlushing(ctx context.Context, onError func(error)) {
 
 // Close releases everything the vault holds. Records still queued for a flush
 // stay on this device and are written by a later run.
+//
+// Closing twice is a no-op rather than an error. A caller that defers a close
+// and also closes explicitly — which is what any code path that wants to prove
+// something survives the vault has to do — should not be reporting failures
+// from the second one.
 func (v *Vault) Close() error {
 	var errs []error
 	if v.packer != nil {
 		v.packer.Stop()
+		v.packer = nil
 	}
 	if v.manifest != nil {
 		errs = append(errs, v.manifest.Close())
+		v.manifest = nil
 	}
 	if v.vectors != nil {
 		errs = append(errs, v.vectors.Close())
+		v.vectors = nil
 	}
-	if v.embedder != nil {
+	if v.embedder != nil && v.ownsEmbedder {
 		errs = append(errs, v.embedder.Close())
+		v.embedder = nil
 	}
 	if v.client != nil {
 		errs = append(errs, v.client.Close())
+		v.client = nil
 	}
 	if v.local != nil {
 		errs = append(errs, v.local.Close())
+		v.local = nil
 	}
 	if v.sealer != nil {
 		v.sealer.Close()
+		v.sealer = nil
 	}
 	return errors.Join(errs...)
 }

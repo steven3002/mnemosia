@@ -22,7 +22,7 @@ func (v *Vault) Describe(ids []record.ID) (recall.Described, error) {
 		Superseded: described.Superseded,
 	}
 	for id, meta := range described.Meta {
-		out.Meta[id] = recall.Meta{Type: meta.Type, Tags: meta.Tags}
+		out.Meta[id] = recall.Meta{Kind: meta.Kind, Type: meta.Type, Tags: meta.Tags}
 	}
 	return out, nil
 }
@@ -31,9 +31,25 @@ func (v *Vault) Describe(ids []record.ID) (recall.Described, error) {
 func rankingMeta(memory *record.Memory) local.RankingMeta {
 	return local.RankingMeta{
 		ID:         memory.ID,
+		Kind:       record.KindMemory,
 		Type:       memory.Type,
 		Tags:       memory.Tags,
 		Supersedes: memory.Supersedes,
 		Text:       local.LexicalText(memory),
+	}
+}
+
+// sessionRankingMeta is what a session contributes to the ranking metadata
+// tables.
+//
+// A session carries no memory type: that vocabulary classifies propositions,
+// and a conversation is not a proposition. It ranks on its tags, its class and
+// the words of its summary, which is everything a session offers a search.
+func sessionRankingMeta(session *record.Session) local.RankingMeta {
+	return local.RankingMeta{
+		ID:   session.ID,
+		Kind: record.KindSession,
+		Tags: session.Tags,
+		Text: local.SessionLexicalText(session),
 	}
 }

@@ -14,56 +14,90 @@ import (
 	"github.com/steven3002/mnemosia/sia"
 )
 
-// Fetch resolves a record id to its decrypted body, cheapest source first.
+// Fetch resolves a record id to the record it names, cheapest source first.
+//
+// A session head is answered from this device and nothing else, because a head
+// is never packed into a slab: it changes on every append, and slabs hold
+// immutable content. Everything else — memories, transcript chunks — is
+// resolved through the three storage tiers.
+func (v *Vault) Fetch(ctx context.Context, id record.ID) (recall.Found, recall.Tier, error) {
+	if session, err := v.session(id); err == nil {
+		return recall.Found{Session: session}, recall.TierLocal, nil
+	} else if !errors.Is(err, local.ErrNotFound) {
+		return recall.Found{}, "", err
+	}
+
+	kind, body, tier, err := v.fetchBody(ctx, id)
+	if err != nil {
+		return recall.Found{}, "", err
+	}
+	switch kind {
+	case record.KindMemory:
+		memory, err := record.Unmarshal(body)
+		return recall.Found{Memory: memory}, tier, err
+	default:
+		return recall.Found{}, "", fmt.Errorf("record %s is a %s and is not something recall returns",
+			id, kind)
+	}
+}
+
+// FetchMemory resolves a record id that is expected to be a memory.
+func (v *Vault) FetchMemory(ctx context.Context, id record.ID) (*record.Memory, recall.Tier, error) {
+	found, tier, err := v.Fetch(ctx, id)
+	if err != nil {
+		return nil, tier, err
+	}
+	if found.Memory == nil {
+		return nil, tier, fmt.Errorf("record %s is not a memory", id)
+	}
+	return found.Memory, tier, nil
+}
+
+// fetchBody resolves a record id to its decrypted body, cheapest source first.
 //
 // The order is not a cache hierarchy bolted on afterwards; the three sources
 // cost about an order of magnitude apart, and which one answered is the main
 // thing that explains a read's latency. Each is counted as it happens, because
 // the hit rates are a property of how the vault is used and cannot be worked
 // out later from anything else it stores.
-func (v *Vault) Fetch(ctx context.Context, id record.ID) (*record.Memory, recall.Tier, error) {
+func (v *Vault) fetchBody(ctx context.Context, id record.ID) (record.Kind, []byte, recall.Tier, error) {
 	start := time.Now()
 
-	if body, err := v.local.GetBody(id); err == nil {
-		memory, err := record.Unmarshal(body)
+	if kind, body, err := v.local.GetRecord(id); err == nil {
 		v.countRead(recall.TierLocal, start)
-		return memory, recall.TierLocal, err
+		return kind, body, recall.TierLocal, nil
 	} else if !errors.Is(err, local.ErrNotFound) {
-		return nil, "", err
+		return "", nil, "", err
 	}
 	v.countMiss(recall.TierLocal)
 
 	entry, err := v.manifest.Lookup(id)
 	if err != nil {
-		return nil, "", err
+		return "", nil, "", err
 	}
 	if v.client == nil {
-		return nil, "", fmt.Errorf("%s is not held on this device: %w", id, errOffline)
+		return "", nil, "", fmt.Errorf("%s is not held on this device: %w", id, errOffline)
 	}
 	ref, err := sia.ParseObjectRef(entry.ObjectRef)
 	if err != nil {
-		return nil, "", err
+		return "", nil, "", err
 	}
 
 	payload, tier, err := v.fetchRemote(ctx, entry, ref)
 	if err != nil {
-		return nil, "", err
+		return "", nil, "", err
 	}
-	memory, err := v.openPayload(id, payload)
+	body, err := v.openBody(id, payload)
 	if err != nil {
-		return nil, "", err
+		return "", nil, "", err
 	}
 	// A record fetched from the network is now held here, so the next read of
 	// it is free.
-	body, err := record.Marshal(memory)
-	if err != nil {
-		return nil, "", err
-	}
 	if err := v.local.PutBody(id, entry.Kind, body); err != nil {
-		return nil, "", err
+		return "", nil, "", err
 	}
 	v.countRead(tier, start)
-	return memory, tier, nil
+	return entry.Kind, body, tier, nil
 }
 
 // fetchRemote reads a record's bytes from the network, using cached location
@@ -204,12 +238,12 @@ func (v *Vault) openPayload(id record.ID, payload []byte) (*record.Memory, error
 	return record.Unmarshal(body)
 }
 
-// FetchFromNetwork reads a record from Sia, bypassing this device's copy.
+// FetchMemoryFromNetwork reads a memory from Sia, bypassing this device's copy.
 //
 // It exists so a round trip can be checked against what was actually stored
 // rather than against what was written locally a moment earlier; the two are
 // only the same if the whole path works.
-func (v *Vault) FetchFromNetwork(ctx context.Context, id record.ID) (*record.Memory, error) {
+func (v *Vault) FetchMemoryFromNetwork(ctx context.Context, id record.ID) (*record.Memory, error) {
 	payload, err := v.StoredBytes(ctx, id)
 	if err != nil {
 		return nil, err

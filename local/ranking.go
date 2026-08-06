@@ -13,7 +13,11 @@ import (
 // RankingMeta is everything ranking needs to know about a record before it has
 // fetched it: what it is, what it is about, and what it replaced.
 type RankingMeta struct {
-	ID   record.ID
+	ID record.ID
+	// Kind is which class of record this is. It is what a caller selects a
+	// scope with, as opposed to Type and Tags, which are what a caller
+	// expresses a preference with.
+	Kind record.Kind
 	Type record.Type
 	Tags []string
 	// Supersedes is the record this one replaces, if any. The reverse edge is
@@ -68,10 +72,15 @@ func (s *Store) PutRankingMeta(meta RankingMeta) error {
 	if meta.Supersedes != nil {
 		supersedes = meta.Supersedes.String()
 	}
+	kind := meta.Kind
+	if kind == "" {
+		kind = record.KindMemory
+	}
 	if _, err := tx.Exec(
-		`INSERT INTO record_meta (record_id, type, supersedes, created_at) VALUES (?, ?, ?, ?)
-		 ON CONFLICT(record_id) DO UPDATE SET type = excluded.type, supersedes = excluded.supersedes`,
-		meta.ID.String(), string(meta.Type), supersedes, record.Now().String()); err != nil {
+		`INSERT INTO record_meta (record_id, kind, type, supersedes, created_at) VALUES (?, ?, ?, ?, ?)
+		 ON CONFLICT(record_id) DO UPDATE SET kind = excluded.kind, type = excluded.type,
+		   supersedes = excluded.supersedes`,
+		meta.ID.String(), string(kind), string(meta.Type), supersedes, record.Now().String()); err != nil {
 		return fmt.Errorf("record metadata %s: %w", meta.ID, err)
 	}
 	if _, err := tx.Exec(`DELETE FROM record_tags WHERE record_id = ?`, meta.ID.String()); err != nil {
@@ -115,7 +124,7 @@ func (s *Store) ForgetRankingMeta(id record.ID) error {
 // RankingMetaAll reads every record's ranking metadata, for hydrating the
 // in-memory view a search consults.
 func (s *Store) RankingMetaAll() ([]RankingMeta, error) {
-	rows, err := s.db.Query(`SELECT record_id, type, supersedes FROM record_meta`)
+	rows, err := s.db.Query(`SELECT record_id, kind, type, supersedes FROM record_meta`)
 	if err != nil {
 		return nil, fmt.Errorf("read ranking metadata: %w", err)
 	}
@@ -124,16 +133,16 @@ func (s *Store) RankingMetaAll() ([]RankingMeta, error) {
 	byID := make(map[record.ID]*RankingMeta)
 	var out []RankingMeta
 	for rows.Next() {
-		var idHex, kind string
+		var idHex, kind, recordType string
 		var supersedes sql.NullString
-		if err := rows.Scan(&idHex, &kind, &supersedes); err != nil {
+		if err := rows.Scan(&idHex, &kind, &recordType, &supersedes); err != nil {
 			return nil, fmt.Errorf("scan ranking metadata: %w", err)
 		}
 		id, err := record.ParseID(idHex)
 		if err != nil {
 			return nil, err
 		}
-		meta := RankingMeta{ID: id, Type: record.Type(kind)}
+		meta := RankingMeta{ID: id, Kind: record.Kind(kind), Type: record.Type(recordType)}
 		if supersedes.Valid && supersedes.String != "" {
 			replaced, err := record.ParseID(supersedes.String)
 			if err != nil {
@@ -252,17 +261,18 @@ func (s *Store) VocabularyTags(limit int) ([]TagCount, error) {
 
 // RankingMetaFor reads one record's ranking metadata.
 func (s *Store) RankingMetaFor(id record.ID) (RankingMeta, error) {
-	var kind string
+	var kind, recordType string
 	var supersedes sql.NullString
 	err := s.db.QueryRow(
-		`SELECT type, supersedes FROM record_meta WHERE record_id = ?`, id.String()).Scan(&kind, &supersedes)
+		`SELECT kind, type, supersedes FROM record_meta WHERE record_id = ?`,
+		id.String()).Scan(&kind, &recordType, &supersedes)
 	if errors.Is(err, sql.ErrNoRows) {
 		return RankingMeta{}, fmt.Errorf("ranking metadata %s: %w", id, ErrNotFound)
 	}
 	if err != nil {
 		return RankingMeta{}, fmt.Errorf("read ranking metadata %s: %w", id, err)
 	}
-	meta := RankingMeta{ID: id, Type: record.Type(kind)}
+	meta := RankingMeta{ID: id, Kind: record.Kind(kind), Type: record.Type(recordType)}
 	if supersedes.Valid && supersedes.String != "" {
 		replaced, err := record.ParseID(supersedes.String)
 		if err != nil {

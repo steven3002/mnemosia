@@ -3,6 +3,7 @@ package recall_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -12,19 +13,18 @@ import (
 	"time"
 
 	"github.com/steven3002/mnemosia/embed"
+	"github.com/steven3002/mnemosia/embed/embedtest"
 	"github.com/steven3002/mnemosia/index"
 	"github.com/steven3002/mnemosia/local"
 	"github.com/steven3002/mnemosia/recall"
 	"github.com/steven3002/mnemosia/record"
 )
 
-// modelDirEnv points the harness at an already-downloaded model.
-//
-// The harness never downloads one. An ordinary `go test ./...` has to touch no
-// network, and a test that quietly fetched 133 MB would break that for everyone
-// who did not ask for it. Continuous integration fetches the model as a setup
-// step and sets this; a contributor without it gets a skip and a green run.
-const modelDirEnv = "MNEMOSIA_MODELS"
+// This is the one package that measures the embedding model, so it is one of
+// only two that load it — the numbers here are properties of that model and a
+// stub would not be measuring anything. The harness never downloads it: an
+// ordinary `go test ./...` has to touch no network, so a machine without the
+// model gets a skip and a green run.
 
 // evalKs are the depths reported. Five is the product-relevant one: it is what
 // an agent is handed and has to find the answer in.
@@ -61,8 +61,8 @@ func (c staticCatalog) Describe([]record.ID) (recall.Described, error) {
 // staticFetcher returns the record the ranker asked for, without storage.
 type staticFetcher struct{ bodies map[record.ID]*record.Memory }
 
-func (f staticFetcher) Fetch(_ context.Context, id record.ID) (*record.Memory, recall.Tier, error) {
-	return f.bodies[id], recall.TierLocal, nil
+func (f staticFetcher) Fetch(_ context.Context, id record.ID) (recall.Found, recall.Tier, error) {
+	return recall.Found{Memory: f.bodies[id]}, recall.TierLocal, nil
 }
 
 // The lexical half of the ranking is measured through the shipped index rather
@@ -131,19 +131,17 @@ func buildHarness() (*harness, string, error) {
 		return nil, "", fmt.Errorf("parse %s: %w", corpusPath, err)
 	}
 
-	root := os.Getenv(modelDirEnv)
-	if root == "" {
-		root = filepath.Join(os.Getenv("HOME"), ".cache", "mnemosia", "models")
-	}
 	model := embed.BGESmallEN
-	if !model.Present(root) {
-		return nil, fmt.Sprintf(
-			"embedding model is not present under %s; set %s to run the recall regression",
-			root, modelDirEnv), nil
-	}
-
 	ctx := context.Background()
-	embedder, err := embed.Open(ctx, model, model.Dir(root))
+	// The model slot is taken for the whole package run and released by the
+	// process exiting, which is the same lifetime the embedder itself has: this
+	// harness is built once and every test in the package queries it. Releasing
+	// it earlier would let a second test binary load a model while this one is
+	// still holding its own.
+	embedder, _, err := embedtest.OpenModel(ctx)
+	if errors.Is(err, embedtest.ErrNoModel) {
+		return nil, fmt.Sprintf("%v; skipping the recall regression", err), nil
+	}
 	if err != nil {
 		return nil, "", fmt.Errorf("open embedder: %w", err)
 	}

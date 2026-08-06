@@ -23,6 +23,7 @@ var frameMagic = [2]byte{'M', 'n'}
 const (
 	kindCodeMemory  = 1
 	kindCodeSession = 2
+	kindCodeChunk   = 3
 )
 
 // A Frame is one framed record recovered from a blob.
@@ -119,6 +120,8 @@ func kindCode(kind record.Kind) (byte, error) {
 		return kindCodeMemory, nil
 	case record.KindSession:
 		return kindCodeSession, nil
+	case record.KindChunk:
+		return kindCodeChunk, nil
 	default:
 		return 0, fmt.Errorf("frame: unknown kind %q", kind)
 	}
@@ -130,6 +133,8 @@ func kindFromCode(code byte) (record.Kind, error) {
 		return record.KindMemory, nil
 	case kindCodeSession:
 		return record.KindSession, nil
+	case kindCodeChunk:
+		return record.KindChunk, nil
 	default:
 		return "", fmt.Errorf("%w: unknown kind code %d", ErrCorrupt, code)
 	}
