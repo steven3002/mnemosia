@@ -15,6 +15,7 @@ require (
 	github.com/gomlx/go-xla v0.3.0 // indirect
 	github.com/gomlx/gomlx v0.28.0 // indirect
 	github.com/gomlx/onnx-gomlx v0.5.0 // indirect
+	github.com/google/jsonschema-go v0.4.3 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/julienschmidt/httprouter v1.3.0 // indirect
 	github.com/klauspost/compress v1.19.1 // indirect
@@ -23,6 +24,7 @@ require (
 	github.com/knights-analytics/hugot v0.7.6 // indirect
 	github.com/knights-analytics/ortgenai v0.3.1 // indirect
 	github.com/mattn/go-isatty v0.0.24 // indirect
+	github.com/modelcontextprotocol/go-sdk v1.7.0 // indirect
 	github.com/ncruces/go-strftime v1.0.0 // indirect
 	github.com/oschwald/geoip2-golang v1.13.0 // indirect
 	github.com/oschwald/maxminddb-golang v1.13.1 // indirect
@@ -31,8 +33,11 @@ require (
 	github.com/quic-go/quic-go v0.59.1 // indirect
 	github.com/quic-go/webtransport-go v0.10.1-0.20260312060737-05fe5253a73c // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
+	github.com/segmentio/asm v1.1.3 // indirect
+	github.com/segmentio/encoding v0.5.4 // indirect
 	github.com/viant/afs v1.30.0 // indirect
 	github.com/yalue/onnxruntime_go v1.31.0 // indirect
+	github.com/yosida95/uritemplate/v3 v3.0.2 // indirect
 	go.sia.tech/core v0.21.0 // indirect
 	go.sia.tech/coreutils v0.22.1-0.20260513143633-9856f6e895bd // indirect
 	go.sia.tech/indexd v0.2.3-0.20260519120331-4eab507a9847 // indirect
@@ -45,6 +50,7 @@ require (
 	golang.org/x/exp v0.0.0-20260718201538-764159d718ef // indirect
 	golang.org/x/image v0.44.0 // indirect
 	golang.org/x/net v0.57.0 // indirect
+	golang.org/x/oauth2 v0.35.0 // indirect
 	golang.org/x/sync v0.22.0 // indirect
 	golang.org/x/sys v0.47.0 // indirect
 	golang.org/x/term v0.45.0 // indirect

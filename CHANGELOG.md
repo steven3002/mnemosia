@@ -6,8 +6,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
-Pre-alpha. No release yet. The storage substrate and a command-line interface over it exist; the MCP
-server and the viewer do not.
+Pre-alpha. No release yet. The storage substrate, a command-line interface, and an MCP server over
+it exist; the viewer does not.
 
 ### Added
 - **Storage substrate.** Records are sealed on the device, batched, and written to Sia in shared
@@ -78,8 +78,34 @@ server and the viewer do not.
   about what an answer will be about and must never cost an answer, while asking for sessions is a
   statement about what is being looked at and is honoured exactly, with the count of what it set
   aside reported alongside.
+- **An MCP server**, `mnemosia-mcp`, over stdio — no listening socket, and both secrets read from the
+  environment rather than from a flag or a tool argument. Six tools: `recall`, `remember`, `browse`,
+  `open`, `save_session`, `forget`. Every one returns a structured result against a declared schema
+  *and* a mirrored text block, and links to records by address rather than by bare id.
+- **One address space, and one function that resolves it.** Memories, conversations and transcripts
+  are addresses in a single namespace, and the tool that opens an address and the protocol's own
+  resource reads are the same code path — not by convention but structurally, because there is one
+  function that turns an address into bytes and both call it. Two entry points into one namespace
+  drift quietly, since each looks correct on its own.
+- **Everything reachable is named in the server's instructions**, and a test asserts that against the
+  server's own registrations in both directions. A host fetches the resource listing when it connects
+  and keeps it to itself, so registering an address does not make it reachable; a model told nothing
+  about an address will correctly refuse to guess one.
+- **A `resume` prompt.** It finds a stored conversation — by address, by topic, or just the most
+  recent — and returns its summary, the memories drawn from it, and its recent turns, so a
+  conversation can be continued in a different agent from the one it happened in. It says how the
+  conversation was chosen and how well it matched, and when it hands over only the recent turns it
+  says so rather than letting them pass for the whole conversation.
+- **Results are concise by default**, with snippets, explicit similarity scores, and addresses to
+  open for the rest. An empty result is a success with a hint, never an error.
+- **A conversation format that survives a real agent's transcript.** Validated against 159 real
+  Claude Code session logs — 46,311 messages — every one of which converts into this format and back
+  with every field intact. Fixing that revealed a defect worth naming: the format's part vocabulary
+  was closed, so a single part type it had not heard of rejected the entire message rather than the
+  part. The vocabulary is now open on write.
 - **Commands:** `init`, `remember`, `recall`, `flush`, `status`, `reclaim`, `recover`.
-- Project scaffolding: README, license, contribution guide, security policy, code of conduct.
+- Project scaffolding: README, license, contribution guide, security policy, code of conduct, and
+  `docs/host-checks.md` for connecting the server to an MCP host and checking that it works.
 
 ### Notes on behaviour worth knowing
 

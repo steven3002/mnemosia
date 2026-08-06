@@ -151,6 +151,57 @@ func TestAToolPartWithoutACorrelationIdIsRefused(t *testing.T) {
 	}
 }
 
+// A part type outside this build's vocabulary is stored rather than refused.
+//
+// Found by running the schema against a real agent's stored transcripts: a tool
+// result may contain a part type this build has never met, and a closed
+// vocabulary costs the whole message rather than the one part — which is the
+// opposite of what a portable record is for. The correlation id stays mandatory,
+// because that one is unrecoverable; a type nobody recognises is not.
+func TestAPartTypeThisBuildDoesNotKnowIsStoredRatherThanRefused(t *testing.T) {
+	unknown := record.Part{
+		Type: "toolReference",
+		Ext:  record.Ext{"toolName": json.RawMessage(`"Bash"`)},
+	}
+	message := record.Message{
+		ID:    "m1",
+		Role:  record.RoleUser,
+		Parts: []record.Part{{Type: record.PartToolResult, CallID: "c1", Content: []record.Part{unknown}}},
+	}
+	if err := message.Validate(); err != nil {
+		t.Fatalf("a part type outside the vocabulary was refused: %v", err)
+	}
+	if unknown.Type.Valid() {
+		t.Fatal("an unrecognised part type reports itself as one this build renders")
+	}
+
+	encoded, err := json.Marshal(message)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	var reloaded record.Message
+	if err := json.Unmarshal(encoded, &reloaded); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	got := reloaded.Parts[0].Content[0]
+	if got.Type != unknown.Type || string(got.Ext["toolName"]) != `"Bash"` {
+		t.Fatalf("the unrecognised part came back as %+v, want %+v", got, unknown)
+	}
+}
+
+// A part with no discriminator at all is still refused: nothing, including a
+// later build that does know the vocabulary, can interpret it.
+func TestAPartWithNoTypeIsRefused(t *testing.T) {
+	message := record.Message{ID: "m1", Role: record.RoleUser, Parts: []record.Part{{Text: "hello"}}}
+	err := message.Validate()
+	if err == nil {
+		t.Fatal("a part with no type was accepted")
+	}
+	if !strings.Contains(err.Error(), "no type") {
+		t.Fatalf("the refusal did not say what was missing: %v", err)
+	}
+}
+
 // Chunking splits on size and never inside a message: half a tool result is not
 // a smaller tool result.
 func TestChunkingSplitsOnSizeAndNeverInsideAMessage(t *testing.T) {

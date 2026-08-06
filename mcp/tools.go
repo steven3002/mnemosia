@@ -144,6 +144,15 @@ and nothing else — records that do not match are still returned, just lower. Y
 answer by guessing, so guess. Supplying three plausible tags is strictly better than supplying none
 for fear of being wrong.
 
+SCOPE IS THE OPPOSITE AND IT DOES EXCLUDE. Read this even if you skipped the paragraph above.
+"scope" names which class of record may answer at all — memory, session, or both — and anything
+outside it is removed rather than ranked lower. It is not a filter and the rule about guessing does
+not apply to it: set it ONLY when the user has named a container, as in "list my sessions" or "what
+conversations do I have about this". Never set it because a question's wording suggests a class. Leave
+it empty for an ordinary question and you get one ranked list holding both, which is what you want
+almost every time. When a scope does remove records the response says how many, so you can see that
+an answer was shortened rather than absent.
+
 By default this returns the vault's CURRENT state: records that have been superseded by a later
 version are held back, and the response says how many. Ask for history explicitly when the user
 wants to know what something used to be, or how a decision changed.
@@ -152,8 +161,125 @@ An empty result is a real answer. It means the vault does not hold this. Say so 
 presenting the closest record as if it were responsive — the user knows what they told you, and a
 confident wrong memory is worse than none.
 
-Each result carries the similarity it earned and the boost the filter gave it, so you can see how
-much of a record's position came from meaning and how much from matching your filter.
+Results are snippets with addresses, not whole records. Call "open" on an address when you need the
+full statement and its context. Each result carries the similarity it earned and the boost the filter
+gave it, so you can see how much of a record's position came from meaning and how much from matching
+your filter.
+`),
+}
+
+// BrowseTool lists rather than searches, and its filters are the hard kind.
+//
+// It is stated in its own voice for exactly that reason. Recall's description
+// spends a paragraph teaching an agent that filters prefer and never exclude,
+// which is correct there and wrong here, and an agent carrying the one rule into
+// the other tool will either believe a browse cannot narrow or believe a recall
+// can empty.
+var BrowseTool = Tool{
+	Name:  "browse",
+	Title: "List what is stored",
+	Description: strings.TrimSpace(`
+List what the vault holds, newest first, by metadata rather than by meaning.
+
+Use this when the user asks what is in there — "what have I saved about the deploy", "show me my
+recent conversations" — and use "recall" when they ask a question the vault might answer. Browsing
+orders by time and never ranks; searching ranks and never orders by time.
+
+EVERY FILTER HERE EXCLUDES. This is the opposite of "recall", deliberately, and the difference is
+about who is guessing. When you infer a tag from the wording of a question you are guessing, and a
+wrong guess must never lose an answer — so recall only ever prefers. When the user asks to see the
+records carrying a tag, nobody is guessing, and returning records without it would be the wrong
+answer rather than a slightly worse one. So here:
+
+- kinds: "memory", "session", or both. Omit for both.
+- types: memory types. A record of another type will not be listed.
+- tags: every listed tag is required. A record carrying two of your three tags will NOT appear.
+
+Because these exclude, an empty result here means exactly what it says and is not evidence that the
+vault holds nothing related. If a browse comes back empty, try recall with the same words as a soft
+filter before telling the user there is nothing.
+
+Returns a page and, when more remain, a cursor. Pass the cursor back verbatim for the next page; it
+is opaque and is not an offset, so a page boundary stays correct even while the vault is being
+written to. When no cursor comes back, you have seen everything.
+
+Superseded records are held back by default, as in recall. Ask for them when the user wants history.
+`),
+}
+
+// OpenTool is the one reader for the whole address space.
+var OpenTool = Tool{
+	Name:  "open",
+	Title: "Read anything by its address",
+	Description: strings.TrimSpace(`
+Read anything in this vault by its address. One opener for the whole namespace: you never need to
+know which part of the system owns an address.
+
+  mnemosia://vault                        what this vault holds, and the tags it already uses
+  mnemosia://guide                        how to use this vault well
+  mnemosia://memory/{id}                  one memory, in full
+  mnemosia://session/{id}                 one conversation: title, summary, counts, links
+  mnemosia://session/{id}/transcript      that conversation's turns
+
+NEVER GUESS AN ADDRESS. Every result from "recall", "browse", "remember" and "save_session" carries
+addresses, and those are the only ones that exist. An id you assembled yourself will not resolve, and
+inventing one that looks plausible is worse than saying you do not have it.
+
+Read mnemosia://vault before your first write in a conversation. It lists the tags this vault already
+uses, and reusing one rather than coining a synonym for it is what keeps related records findable
+together — tags are matched exactly, so "cache-invalidation" and "cache_invalidation" are two
+different tags holding half the answer each.
+
+A transcript can be long. Pass a limit to read a page of it, and pass the returned "nextFrom" back as
+"from" to continue. Reading a conversation's head costs nothing like reading its transcript: the head
+is about a kilobyte whatever the conversation's size, so prefer opening the session first and the
+transcript only if you need the turns.
+`),
+}
+
+// SaveSessionTool stores the conversation itself.
+//
+// The description spends its length on the summary for the same reason
+// `remember` spends it on context: the summary and the tags are the entire
+// searchable surface of a conversation. The transcript is never embedded, so a
+// session saved with a thin summary is a conversation that cannot be found
+// again, however much of it was stored.
+var SaveSessionTool = Tool{
+	Name:  "save_session",
+	Title: "Store a conversation",
+	Description: strings.TrimSpace(`
+Store this conversation in the user's vault so it can be found and continued later — including in a
+different agent.
+
+Call this when a conversation is worth returning to, or whenever the user asks you to save it.
+
+WHAT DECIDES WHETHER IT IS EVER FOUND AGAIN:
+
+- title: one line, specific. "Tide station registry disagreement" is a title; "Chat" is not.
+- summary: what was decided, what was tried, what is still open. THE TRANSCRIPT IS NOT SEARCHABLE —
+  only the title, summary and tags are, because a conversation is mostly filler and tool noise and
+  the summary is what a search is actually looking for. Write it for someone deciding whether to open
+  the conversation, not as a record of it. Two to five sentences.
+- tags: two to four specific ones, reused from the vault's own vocabulary where they fit.
+
+- messages: the turns. Each needs an id unique within the conversation, a role, and content as an
+  ordered list of typed parts — text, reasoning, toolCall, toolResult, file, resourceLink. A tool call
+  and the result it produced MUST carry the same callId; that correlation is the one thing no later
+  reader can reconstruct, and a call without it is refused rather than stored broken. Anything your
+  runtime knows that this schema does not name goes in "ext" on the message or the part, and comes
+  back exactly as it went in.
+
+APPENDING. To add turns to a conversation already stored, pass its address as "session" and ONLY the
+new turns. Nothing already stored is rewritten, so the cost of an append is the size of the append.
+The title, summary and tags are updated only if you supply them, so you can add turns without
+restating what you already said — but do refresh the summary when the conversation has moved on, or
+it will be found by what it used to be about.
+
+DURABILITY. The conversation is on the user's device before this returns and reaches the network on
+the vault's ordinary schedule, within the hour. The response says which has happened. Do not tell the
+user a conversation is stored on the network until the response says it is. Set "durable" to write it
+to the network now — do that at the end of a long session, not on every append, because each forced
+write costs a whole storage block whatever it holds.
 `),
 }
 
@@ -163,19 +289,31 @@ var ForgetTool = Tool{
 	Name:  "forget",
 	Title: "Remove a memory",
 	Description: strings.TrimSpace(`
-Remove a record from the user's vault.
+Remove a record from the user's vault, by its address.
 
 Prefer superseding to forgetting. A record that has become wrong is usually worth keeping as
 history, and superseding it removes it from ordinary recall while leaving the trail intact. Forget is
 for things the user does not want stored at all.
+
+Requires "confirm": true. Ask the user first unless they have just asked you to delete this
+particular thing — you are removing something from a store they own, and it is the one operation here
+that cannot be undone from inside the vault.
+
+Forgetting a conversation removes its transcript too. Forgetting a memory drawn from a conversation
+leaves the conversation alone.
 
 This does not immediately return storage. Records share storage with everything written alongside
 them, so space comes back later, when nothing in a batch is still needed. Do not report freed space.
 `),
 }
 
-// Tools is the memory surface in the order an agent meets it.
-var Tools = []Tool{RememberTool, RecallTool, ForgetTool}
+// Tools is the surface in the order an agent meets it.
+//
+// The order is not alphabetical and is not arbitrary. A host that discovers
+// tools progressively shows the model names and one-line descriptions long
+// before it fetches a schema, so the first two are the ones the product is named
+// around and the ones a model should reach for without thinking.
+var Tools = []Tool{RecallTool, RememberTool, BrowseTool, OpenTool, SaveSessionTool, ForgetTool}
 
 // TypeGuidance is the one-line gloss for each type in the vocabulary, for
 // building a tool schema's enum documentation without restating it by hand.

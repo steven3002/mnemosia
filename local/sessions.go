@@ -123,6 +123,22 @@ func (s *Store) GetSessionHead(id record.ID) ([]byte, error) {
 	return head, nil
 }
 
+// SessionTitle reads just the title of one session.
+//
+// It selects the denormalised column and not the head, so naming a session in a
+// listing costs a short row rather than the head's whole chunk list.
+func (s *Store) SessionTitle(id record.ID) (string, error) {
+	var title string
+	err := s.db.QueryRow(`SELECT title FROM session_heads WHERE session_id = ?`, id.String()).Scan(&title)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", fmt.Errorf("session %s: %w", id, ErrNotFound)
+	}
+	if err != nil {
+		return "", fmt.Errorf("read session title %s: %w", id, err)
+	}
+	return title, nil
+}
+
 // ForgetSessionHead drops a session head from the device.
 func (s *Store) ForgetSessionHead(id record.ID) error {
 	if _, err := s.db.Exec(`DELETE FROM session_heads WHERE session_id = ?`, id.String()); err != nil {

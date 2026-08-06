@@ -64,9 +64,18 @@ const (
 )
 
 // PartTypes lists the vocabulary in its canonical order.
+//
+// It is what this build knows how to render, and deliberately not what it will
+// accept. A stored transcript may carry a part type from a provider this build
+// has never met or from a later build of the vault itself, and refusing it would
+// cost the whole conversation rather than one part of it.
 var PartTypes = []PartType{PartText, PartReasoning, PartToolCall, PartToolResult, PartFile, PartResourceLink}
 
-// Valid reports whether t is in the vocabulary.
+// Valid reports whether t is in this build's vocabulary.
+//
+// A part outside it is still storable and still round-trips; this is what a
+// renderer asks before deciding whether it understands the part well enough to
+// display it as something other than an opaque block.
 func (t PartType) Valid() bool {
 	for _, known := range PartTypes {
 		if t == known {
@@ -224,9 +233,18 @@ func (m *Message) Validate() error {
 }
 
 func (p *Part) validate(messageID string) error {
-	if !p.Type.Valid() {
-		return fmt.Errorf("%w: message %s carries a %q part, want one of %s",
-			ErrInvalid, messageID, p.Type, strings.Join(partTypeNames(), ", "))
+	// The vocabulary is open, and this is the one place that has to say so.
+	//
+	// Measured against a real agent's stored log: a tool result may contain a
+	// part type this build has never heard of, and a closed vocabulary refuses
+	// the whole message rather than the part — which is the opposite of what a
+	// portable record is for. Nothing above this is asked to understand an
+	// unrecognised part; it is stored with its fields intact and rendered as
+	// opaque. A type is required because a part with none cannot be interpreted
+	// by anything, including a later build that does know the vocabulary.
+	if strings.TrimSpace(string(p.Type)) == "" {
+		return fmt.Errorf("%w: message %s carries a part with no type; the discriminator is what "+
+			"makes a stored part interpretable at all", ErrInvalid, messageID)
 	}
 	// The correlation id is the one field whose absence is unrecoverable. A
 	// call without it cannot be matched to its result by any later reader, and
@@ -250,14 +268,6 @@ func roleNames() []string {
 	out := make([]string, len(Roles))
 	for i, r := range Roles {
 		out[i] = string(r)
-	}
-	return out
-}
-
-func partTypeNames() []string {
-	out := make([]string, len(PartTypes))
-	for i, t := range PartTypes {
-		out[i] = string(t)
 	}
 	return out
 }
