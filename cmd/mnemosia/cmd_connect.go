@@ -1,12 +1,14 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/hex"
 	"errors"
 	"flag"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/steven3002/mnemosia/keys"
@@ -101,9 +103,45 @@ func writeAppKey(path string, key keys.AppKey) error {
 	if err != nil {
 		return fmt.Errorf("write the app key: %w", err)
 	}
-	defer file.Close()
 	if _, err := fmt.Fprintln(file, hex.EncodeToString(key)); err != nil {
+		file.Close()
 		return fmt.Errorf("write the app key: %w", err)
 	}
-	return file.Chmod(0o600)
+	if err := file.Chmod(0o600); err != nil {
+		file.Close()
+		return fmt.Errorf("write the app key: %w", err)
+	}
+	// Closed before it is read back, so the check sees the file rather than a
+	// buffer that has not reached it.
+	if err := file.Close(); err != nil {
+		return fmt.Errorf("write the app key: %w", err)
+	}
+	return verifyAppKey(path, key)
+}
+
+// verifyAppKey reads back what was written and confirms it decodes to the key
+// that was issued.
+//
+// The approval happens once and cannot be repeated cheaply: the link expires in
+// about ten minutes and a second round needs the person and the browser again.
+// So the expensive thing to get wrong is a key file that exists, looks
+// plausible, and does not carry the key, a truncated write, a full disk, an
+// encoding slip. That failure surfaces much later as an authorization error
+// against the indexer, by which time nothing connects it to this step.
+func verifyAppKey(path string, want keys.AppKey) error {
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return fmt.Errorf("read back the app key just written to %s: %w", path, err)
+	}
+	got, err := hex.DecodeString(strings.TrimSpace(string(raw)))
+	if err != nil {
+		return fmt.Errorf("the app key written to %s cannot be decoded: %w", path, err)
+	}
+	if !bytes.Equal(got, want) {
+		return fmt.Errorf(
+			"the app key written to %s is not the key the indexer issued (%s on disk, %s issued): "+
+				"the approval succeeded but the file did not, so remove it and run connect again",
+			path, keys.AppKey(got).Fingerprint(), want.Fingerprint())
+	}
+	return nil
 }

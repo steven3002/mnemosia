@@ -63,11 +63,17 @@ func report(err error) {
 		fmt.Fprintf(os.Stderr, "mnemosia: no Sia app key.\n\n"+
 			"  Set %s to the app key issued when you approved this\n"+
 			"  installation with your indexer. It is a secret: keep it out of\n"+
-			"  shell history and never pass it as an argument.\n", keys.AppKeyEnv)
+			"  shell history and never pass it as an argument.\n\n"+
+			"  If you have not approved this installation yet, run:\n"+
+			"    mnemosia connect -out mnemosia.key\n\n"+
+			"  To work without an indexer, pass -offline before the arguments:\n"+
+			"    mnemosia remember -offline -context \"...\" \"...\"\n", keys.AppKeyEnv)
 	case errors.Is(err, keys.ErrNoPhrase):
 		fmt.Fprintf(os.Stderr, "mnemosia: no recovery phrase.\n\n"+
 			"  Set %s, or pipe the phrase in on stdin. The vault derives its\n"+
-			"  keys from it on every run and never stores it.\n", keys.PhraseEnv)
+			"  keys from it on every run and never stores it.\n\n"+
+			"  If you do not have one yet, this prints a new one and stores nothing:\n"+
+			"    mnemosia init -new-phrase\n", keys.PhraseEnv)
 	default:
 		fmt.Fprintf(os.Stderr, "mnemosia: %v\n", err)
 	}
@@ -77,9 +83,11 @@ func usage() {
 	fmt.Fprint(os.Stderr, `mnemosia, user-owned storage for an AI's memory, on Sia
 
 usage:
+  mnemosia init -new-phrase          print a fresh recovery phrase and exit
   mnemosia connect -out <file>       approve this installation with an indexer
   mnemosia init                      derive keys, prepare the vault, connect
-  mnemosia remember "<statement>"    store a memory
+  mnemosia remember -context "<why it matters>" "<statement>"
+                                     store a memory; -context is required
   mnemosia recall "<query>"          retrieve memories by meaning
   mnemosia flush                     write queued records to Sia now
   mnemosia status                    what is held, what is queued, what is billed

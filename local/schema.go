@@ -14,7 +14,7 @@ var schema = []string{
 	// Vectors used to live here. They moved to a base-plus-delta pair of files
 	// beside the catalog, for two reasons. One is write amplification, the same
 	// reason the catalog is shaped that way. The other is that a row keyed to
-	// bodies with a cascade meant that dropping this device's copy of a record —
+	// bodies with a cascade meant that dropping this device's copy of a record,
 	// which is how the lower read tiers are reached at all, silently deleted
 	// its vector and made the record unsearchable.
 	`DROP TABLE IF EXISTS vectors`,
@@ -99,11 +99,18 @@ var schema = []string{
 	// Slabs this vault has pinned. Without this list nothing can ever be
 	// released: the indexer bills a whole slab whether it holds live records or
 	// none, and no other party knows which slabs are ours.
+	//
+	// origin separates the two ways a slab reaches this list, because only one
+	// of them confers the right to release it. A slab this installation pinned
+	// is its to release; a slab it merely found by hydrating is another
+	// device's, and unpinning it would take away storage that device is still
+	// pointing at.
 	`CREATE TABLE IF NOT EXISTS slabs (
 		slab_id   TEXT PRIMARY KEY,
 		pinned_at TEXT NOT NULL,
 		records   INTEGER NOT NULL DEFAULT 0,
-		bytes     INTEGER NOT NULL DEFAULT 0
+		bytes     INTEGER NOT NULL DEFAULT 0,
+		origin    TEXT NOT NULL DEFAULT 'pinned'
 	)`,
 	// Records sealed and waiting for a flush. Holding the queue here rather
 	// than in memory is what closes the window in which a record the user was
@@ -170,6 +177,11 @@ var schema = []string{
 // the presence of each one is checked before it is added.
 var columnAdditions = []struct{ table, column, definition string }{
 	{"record_meta", "kind", "TEXT NOT NULL DEFAULT 'memory'"},
+	// A ledger written before this column existed predates hydration filing
+	// anything into it, so every row in one was pinned by that installation.
+	// The default says so; it is the only reading that does not silently strip
+	// an existing vault of the right to reclaim its own storage.
+	{"slabs", "origin", "TEXT NOT NULL DEFAULT 'pinned'"},
 }
 
 func (s *Store) migrate() error {

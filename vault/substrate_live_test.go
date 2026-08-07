@@ -89,7 +89,7 @@ func releaseVault(t *testing.T, v *vault.Vault) {
 			return
 		}
 	}
-	sweep, err := v.Reclaim(context.Background())
+	sweep, err := v.Reclaim(context.Background(), vault.ReclaimOptions{})
 	if err != nil {
 		t.Errorf("reclaim: %v", err)
 		return
@@ -396,7 +396,7 @@ func TestLiveReclaimFreesExactlyTheDeadSlabs(t *testing.T) {
 			dropped++
 		}
 	}
-	partial, err := v.Reclaim(ctx)
+	partial, err := v.Reclaim(ctx, vault.ReclaimOptions{})
 	if err != nil {
 		t.Fatalf("reclaim after dropping half a slab: %v", err)
 	}
@@ -416,7 +416,7 @@ func TestLiveReclaimFreesExactlyTheDeadSlabs(t *testing.T) {
 			}
 		}
 	}
-	full, err := v.Reclaim(ctx)
+	full, err := v.Reclaim(ctx, vault.ReclaimOptions{})
 	if err != nil {
 		t.Fatalf("reclaim after emptying a slab: %v", err)
 	}
@@ -515,7 +515,7 @@ func TestLiveReclaimLeavesForeignStorageAlone(t *testing.T) {
 		}
 	}
 
-	sweep, err := v.Reclaim(ctx)
+	sweep, err := v.Reclaim(ctx, vault.ReclaimOptions{})
 	if err != nil {
 		t.Fatalf("reclaim: %v", err)
 	}

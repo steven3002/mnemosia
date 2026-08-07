@@ -47,6 +47,11 @@ type Vault struct {
 	// the check that gates the first one is not repeated on every later one.
 	ready        atomic.Bool
 	sessionStats sessionCounters
+	// offlineBecause records that the vault wanted a connection and could not
+	// get one. It is distinct from the caller asking to be offline, and it is
+	// reported rather than swallowed: silently working from the device is right
+	// for a read and wrong to leave unsaid before a write.
+	offlineBecause error
 }
 
 // sessionCounters are read counts a session claim is asserted against.
@@ -89,8 +94,22 @@ func Open(ctx context.Context, opts Options) (*Vault, error) {
 	}
 	if !opts.Offline {
 		if err := v.connect(ctx); err != nil {
-			v.Close()
-			return nil, err
+			// An indexer that cannot be reached degrades the vault instead of
+			// refusing to open it. Everything a read needs, the query
+			// embedding, the vector search, the device's own copy of a record,
+			// is local, so a network outage was turning a working local search
+			// into a hard failure. A write is queued exactly as it is when the
+			// caller asked to be offline, and the queue is what owes it to the
+			// network later.
+			//
+			// Only unreachability degrades. A refusal is a different thing: an
+			// unauthorized installation needs the user to do something, and
+			// carrying on quietly would hide the one message that says what.
+			if !errors.Is(err, sia.ErrIndexerUnreachable) {
+				v.Close()
+				return nil, err
+			}
+			v.offlineBecause = err
 		}
 	}
 	// The packer exists whether or not there is a connection. Offline it can
@@ -361,6 +380,12 @@ func (v *Vault) Close() error {
 // Online reports whether the vault has a connection to an indexer.
 func (v *Vault) Online() bool { return v.client != nil }
 
+// OfflineBecause reports why a vault that asked for a connection has none.
+//
+// It is nil both for a vault that is connected and for one the caller asked to
+// be offline. Only an indexer that could not be reached sets it.
+func (v *Vault) OfflineBecause() error { return v.offlineBecause }
+
 // Indexer reports which indexer the vault is connected to.
 func (v *Vault) Indexer() string {
 	if v.client == nil {
@@ -403,7 +428,7 @@ const FirstWriteBudget = 90 * time.Second
 //
 // Approval and readiness are two different events, and the gap between them is
 // the first thing a new device meets. Without this the very first write after
-// onboarding fails, with an error that names hosts and does not say to wait —
+// onboarding fails, with an error that names hosts and does not say to wait,
 // which is the shape of failure that makes a user conclude the product is broken
 // rather than busy.
 //

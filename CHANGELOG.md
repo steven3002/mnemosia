@@ -4,10 +4,14 @@ All notable changes to this project are documented here.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.1.0], 2026-08-07
 
-Pre-alpha. No release yet. The storage substrate, a command-line interface, and an MCP server over
-it exist; the viewer does not.
+**First release.** Pre-alpha, and complete enough that someone else can clone the repository and run
+it: the [README quickstart](README.md#quickstart) is tested end to end from a fresh clone in an
+environment that has never seen this project. The storage substrate, a command-line interface and an
+MCP server over it exist; the viewer and the `skill` record type do not.
+
+Everything below has been exercised against the live Sia network unless it says otherwise.
 
 ### Added
 - **Storage substrate.** Records are sealed on the device, batched, and written to Sia in shared
@@ -103,19 +107,74 @@ it exist; the viewer does not.
   with every field intact. Fixing that revealed a defect worth naming: the format's part vocabulary
   was closed, so a single part type it had not heard of rejected the entire message rather than the
   part. The vocabulary is now open on write.
-- **Commands:** `init`, `remember`, `recall`, `flush`, `status`, `reclaim`, `recover`.
+- **Commands:** `init`, `connect`, `remember`, `recall`, `flush`, `status`, `reclaim`, `recover`,
+  `hydrate`.
+- **`mnemosia connect`,** the whole onboarding path in one command: it holds a live approval link
+  open across the roughly ten minutes each one lasts and reissues on expiry, writes the issued app
+  key to a file at `0600`, **reads that file back and confirms it carries the key the indexer
+  issued**, and then waits for the account to become writable, because approval is not readiness,
+  and a write before the indexer has funded host accounts fails with a message about hosts that says
+  nothing about waiting.
+- **`mnemosia hydrate`,** which rebuilds a vault on a machine that has never held it, in three
+  stages whose costs are three orders of magnitude apart, so the vault is usable before it is
+  complete.
+- **Continuous integration**: build without cgo, vet, gofmt, the full test suite, a race-detector
+  pass over the concurrent packages, and the **recall regression harness reporting hit@1/3/5/10** on
+  the committed synthetic corpus, so a change in retrieval quality moves a number in a build log
+  instead of going unnoticed.
 - Project scaffolding: README, license, contribution guide, security policy, code of conduct, and
   `docs/host-checks.md` for connecting the server to an MCP host and checking that it works.
+
+### Fixed
+
+- **An already-released slab no longer fails a reclamation.** The code intended to treat a slab the
+  indexer had released on its own as success, and the check never matched: the sentinel is
+  `slab not found`, and the service sends `slab <id> not found`, with the id in the middle. The
+  tolerance had been in place since the behaviour was anticipated and had never once fired. When
+  `sia.storage` deployed automatic slab release, **every repack began reporting a failure after
+  completing its work**, and left a ledger entry that made every later sweep fail on the same slab.
+- **`recall` no longer fails when the indexer is unreachable.** Query embedding, vector search and
+  the device's own copy of a record are all local, so an outage was turning a working local search
+  into a hard failure. A vault that cannot reach the indexer now opens degraded, says so, answers
+  reads from the device and queues writes.
+- **Indexer errors no longer quote the request URL or the response body.** The SDK's URLs carry the
+  app key's signed authentication parameters, so a connection failure was printing credentials into
+  the terminal; a gateway error was printing a CDN's HTML. Failures now name the operation, the
+  service, the status and what to do about it.
+- **Flags written after the text are refused rather than silently read as part of it.** Go's flag
+  parsing stops at the first plain word, so `remember "..." -offline` took `-offline` as prose and
+  then failed asking for an app key the user had just said they did not want to use.
+- **`-context` is required and now says so where you meet it**, naming the flag rather than
+  explaining the concept, and the top-level usage shows it.
+- **The "no recovery phrase" error names `init -new-phrase`.** A first-time user has no phrase, and
+  nothing in the error said the tool could make one.
 
 ### Notes on behaviour worth knowing
 
 - **A saved record is not yet a stored record.** Writes are durable on the device immediately and
   reach the network on a flush. Nothing in the interface conflates the two.
-- **Deleting a record frees no space by itself.** Records share a storage slab and a slab is billed
-  whole, so space returns when a slab has nothing live left in it and reclamation runs.
-- **Repack is manual.** It holds the old and new storage at the same time, and its behaviour under
-  concurrent writes and under interruption has not been measured, so nothing triggers it
-  automatically.
+- **Records share a storage slab and a slab is billed whole**, so forgetting one record out of a
+  slab returns no space; the space returns when a slab has nothing live left in it.
+  ⚠️ **Changed under us, measured 2026-08-07:** the hosted indexer now releases a slab **within
+  300 ms** of its last object being deleted, with no explicit unpin. It did not do this on
+  2026-08-05, when the same check waited six minutes and the slab stayed pinned. Reclamation still
+  deletes objects first and releases slabs second, that order is what makes it correct under both
+  regimes, and the reverse order strands objects permanently either way.
+- **Reclamation fails closed.** A sweep refuses to run when the keep-set it computes does not account
+  for every record the catalog holds, and an empty catalog over pinned slabs stops it rather than
+  authorising it. An empty keep-set means the computation is wrong, not that the data is dead, a
+  fail-open default destroyed data here twice.
+- **A hydrated vault may read storage it did not write and may not release it.** Hydration reaches
+  every slab holding a record the phrase opens, which would otherwise let a second device unpin
+  storage the first one is still pointing at. `reclaim -take-ownership` is the deliberate act for a
+  vault whose writing installation is gone for good.
+- **Repack is manual, and it holds the old and new storage at the same time.** Measured under
+  concurrent writes and under interruption (below); nothing triggers it automatically.
+- **An interrupted repack loses no data and can strand one slab.** Killed inside its write phase, it
+  leaves the records readable at their old locations and the catalog untouched, and may leave a slab
+  pinned that the device's ledger never learned about, the network answers with the slab id after
+  the process is gone. `mnemosia reclaim` cannot see it, `mnemosia reclaim -orphans` releases it, and
+  `mnemosia status` now reports storage billed to the account that the ledger does not know.
 - **Retrieval quality depends on what else is in the vault.** A vault where nearly everything
   concerns one subject is measurably harder to search than a varied one, because the records
   competing with the right answer share its tags and the filter cannot tell them apart. Quoted
@@ -156,4 +215,25 @@ Design and feasibility work completed against the **live Sia network**. Findings
   competing records scored 0.690 against 0.933 for the rest of the same vault. Quality is reported
   per query as well as in aggregate for that reason.
 
-[Unreleased]: https://github.com/steven3002/mnemosia
+### Measured for this release, on the live network
+
+Configuration for every figure: hosted indexer `sia.storage`, free tier, 46.57 GiB ceiling, 40 MiB
+slabs, one 2-vCPU Linux host, 2026-08-07. A number without its configuration is not a number.
+
+- **Repack under concurrent writes: no penalty and no lost writes.** 12 records over 3 slabs into 1,
+  transient peak 4 slabs, **10.64 s under load against 10.83 s idle** on the identical path. Every
+  repacked record read back byte-exact from its new location. While it ran, a **second process**
+  wrote and flushed 8 more records into the same vault; after reopening, the catalog held all 12
+  relocations and all 8 new records, 20 of 20.
+- **Repack interrupted: no data loss.** Killed inside its write phase, all 12 records stayed readable
+  byte-exact at their old locations and the catalog was unchanged. The cost is up to one slab
+  (40 MiB) pinned and unknown to the ledger, fully recovered by `reclaim -orphans`.
+- **Deleting every object over a slab returns its quota in ~300 ms** with no unpin call.
+- **Free-tier exhaustion behaviour is NOT measured.** Reaching it means filling 46.57 GiB, about
+  1,192 slabs, on the only account this project has, and the failure it induces is precisely the one
+  that leaves an account unable to repack itself. A second account needs a browser approval by a
+  person. What is checked instead is the gate in front of it: repack is refused on the **transient
+  peak** it needs rather than on the steady state it would end at, since an account can be under its
+  limit both before and after a repack and unable to afford the moment in between.
+
+[0.1.0]: https://github.com/steven3002/mnemosia

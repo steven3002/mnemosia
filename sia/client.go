@@ -1,6 +1,6 @@
 // Package sia is the only package that speaks to the Sia SDK and indexer.
 //
-// The boundary is deliberate: the SDK has surprised this project three times —
+// The boundary is deliberate: the SDK has surprised this project three times,
 // a prune cutoff it gives no way to override, a reclamation call it does not
 // expose, and a download path that panics in a goroutine the caller cannot
 // recover. Confining it to one package means the next surprise is absorbed in
@@ -72,7 +72,7 @@ func Connect(cfg Config) (*Client, error) {
 		if errors.Is(err, siastorage.ErrUnauthorized) {
 			return nil, fmt.Errorf("%w: %s", ErrUnauthorized, indexer)
 		}
-		return nil, fmt.Errorf("open sdk against %s: %w", indexer, err)
+		return nil, asIndexerError("connect to the indexer", indexer, err)
 	}
 	return &Client{
 		sdk:     sdk,

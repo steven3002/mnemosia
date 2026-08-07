@@ -84,11 +84,6 @@ func (r *Reclaimer) Repack(ctx context.Context, writer *store.Store, held []Held
 		return report, nil
 	}
 
-	var err error
-	if report.Before, err = r.client.Account(ctx); err != nil {
-		return report, err
-	}
-
 	from := make(map[sia.SlabID]struct{})
 	for _, item := range held {
 		if item.SlabID != "" {
@@ -96,6 +91,20 @@ func (r *Reclaimer) Repack(ctx context.Context, writer *store.Store, held []Held
 		}
 	}
 	report.SlabsBefore = len(from)
+
+	// Repack ends by unpinning everything it read from, so a vault that would
+	// be repacking another device's storage is stopped before it writes rather
+	// than after. Refusing outright is the honest answer: the alternative,
+	// rewriting the records and keeping both copies, would pin new slabs and
+	// release none, which is the opposite of what was asked for.
+	if err := r.ownsAll(from); err != nil {
+		return report, err
+	}
+
+	var err error
+	if report.Before, err = r.client.Account(ctx); err != nil {
+		return report, err
+	}
 
 	read := time.Now()
 	blobs := make([]store.Blob, len(held))
@@ -172,6 +181,38 @@ func (r *Reclaimer) Repack(ctx context.Context, writer *store.Store, held []Held
 	}
 	report.Elapsed = time.Since(start)
 	return report, nil
+}
+
+// ownsAll reports whether every slab named was pinned by this installation.
+//
+// A hydrated vault holds records that live on another device's slabs. Reading
+// them is what hydration is for; releasing them is not, and repack's last act
+// is to release everything it read from.
+func (r *Reclaimer) ownsAll(slabs map[sia.SlabID]struct{}) error {
+	if len(slabs) == 0 {
+		return nil
+	}
+	tracked, err := r.Tracked()
+	if err != nil {
+		return err
+	}
+	ours := make(map[sia.SlabID]bool, len(tracked))
+	for _, slab := range tracked {
+		ours[slab.ID] = slab.Releasable()
+	}
+	var foreign int
+	for id := range slabs {
+		if !ours[id] {
+			foreign++
+		}
+	}
+	if foreign == 0 {
+		return nil
+	}
+	return fmt.Errorf(
+		"%w: %d of %d slab(s) holding these records were pinned by another device and hydrated here. "+
+			"Repack releases the slabs it reads from, so run it on the device that wrote them",
+		ErrNotOursToRelease, foreign, len(slabs))
 }
 
 // DefaultWatermark is the share of quota above which repack should run.

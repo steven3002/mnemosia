@@ -109,7 +109,7 @@ func TestLiveSessionChunksRideThePackerAndComeBack(t *testing.T) {
 	if err := v.ForgetSession(saved.ID); err != nil {
 		t.Fatalf("forget the session: %v", err)
 	}
-	sweep, err := v.Reclaim(ctx)
+	sweep, err := v.Reclaim(ctx, vault.ReclaimOptions{})
 	if err != nil {
 		t.Fatalf("reclaim: %v", err)
 	}

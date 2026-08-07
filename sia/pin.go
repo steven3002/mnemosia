@@ -12,7 +12,7 @@ import (
 // PinSlabs registers the slabs a batch occupies, once for the whole batch.
 //
 // The SDK's own PinObject performs this step per object. Every object in a
-// packed flush shares one slab, so all but the first of those calls is waste —
+// packed flush shares one slab, so all but the first of those calls is waste,
 // which is why the two halves are split here rather than left fused.
 func (c *Client) PinSlabs(ctx context.Context, batch *Batch) error {
 	if batch == nil || len(batch.objects) == 0 {
@@ -105,7 +105,7 @@ func (c *Client) UnpinSlab(ctx context.Context, id SlabID) error {
 		return err
 	}
 	if err := c.app.UnpinSlab(ctx, c.appKey, slabID); err != nil {
-		if isSlabGone(err) {
+		if isSlabGone(err, id) {
 			return nil
 		}
 		return fmt.Errorf("unpin slab %s: %w", id, err)
@@ -113,11 +113,31 @@ func (c *Client) UnpinSlab(ctx context.Context, id SlabID) error {
 	return nil
 }
 
-// isSlabGone recognises the indexer's absent-slab reply, by message because
-// that is all that survives the wire.
-func isSlabGone(err error) bool {
-	return err != nil && strings.Contains(err.Error(), slabs.ErrSlabNotFound.Error())
+// isSlabGone recognises the indexer's absent-slab reply.
+//
+// The test is on the message because that is all that survives the wire: the
+// indexer's typed error is rendered into the response body and rebuilt by the
+// client as a plain error, so there is nothing to compare against. It cannot be
+// a test for the sentinel's own text either. The service interpolates the slab
+// id into the middle of that wording, "slab not found" arrives as
+// "slab <id> not found", so a search for the sentinel matches nothing, which
+// is why the tolerance below it went four scopes without ever firing.
+//
+// Requiring the id as well as the words keeps it narrow. A transport-level "404
+// page not found", or any absence that is not this slab's, is not swallowed.
+func isSlabGone(err error, id SlabID) bool {
+	if err == nil {
+		return false
+	}
+	message := err.Error()
+	if strings.Contains(message, slabs.ErrSlabNotFound.Error()) {
+		return true
+	}
+	return strings.Contains(message, string(id)) && strings.Contains(message, notFoundPhrase)
 }
+
+// notFoundPhrase is the tail the indexer keeps whichever entity it names.
+const notFoundPhrase = "not found"
 
 // DeleteObject removes an object's entry from the indexer.
 //
@@ -130,7 +150,7 @@ func isSlabGone(err error) bool {
 // part of it finished last time.
 func (c *Client) DeleteObject(ctx context.Context, ref ObjectRef) error {
 	if err := c.sdk.DeleteObject(ctx, ref.ID); err != nil {
-		if isNotFound(err) {
+		if isNotFound(err, ref) {
 			return nil
 		}
 		return fmt.Errorf("delete object %s: %w", ref, err)
@@ -140,11 +160,18 @@ func (c *Client) DeleteObject(ctx context.Context, ref ObjectRef) error {
 
 // isNotFound recognises the indexer's absent-object reply.
 //
-// It matches on the message because that is all that survives the wire: the
-// indexer's typed error is rendered into the response body and rebuilt by the
-// client as a plain error, so there is nothing to compare against.
-func isNotFound(err error) bool {
-	return err != nil && strings.Contains(err.Error(), slabs.ErrObjectNotFound.Error())
+// Shaped like isSlabGone and for the same reason: the typed error does not
+// survive the wire, and the service interpolates the id into the sentinel's own
+// wording, so the sentinel is not a substring of what arrives.
+func isNotFound(err error, ref ObjectRef) bool {
+	if err == nil {
+		return false
+	}
+	message := err.Error()
+	if strings.Contains(message, slabs.ErrObjectNotFound.Error()) {
+		return true
+	}
+	return strings.Contains(message, ref.String()) && strings.Contains(message, notFoundPhrase)
 }
 
 func parseSlabID(id SlabID) (slabs.SlabID, error) {

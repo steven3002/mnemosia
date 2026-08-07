@@ -83,7 +83,7 @@ func (c *Client) WalkObjectsStats(ctx context.Context, fn func(StoredObject) err
 		// to enumerate itself.
 		events, err := c.app.ListObjects(ctx, c.appKey, cursor, EnumeratePageSize)
 		if err != nil {
-			return stats, fmt.Errorf("list objects after %s: %w", cursor.After, err)
+			return stats, asIndexerError("list the account's objects", c.indexer, err)
 		}
 		if len(events) == 0 {
 			break

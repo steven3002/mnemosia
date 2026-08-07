@@ -23,9 +23,21 @@ func runRemember(ctx context.Context, args []string) error {
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
+	if err := checkFlagOrder(fs.Args()); err != nil {
+		return err
+	}
 	statement := strings.TrimSpace(strings.Join(fs.Args(), " "))
 	if statement == "" {
 		return fmt.Errorf("nothing to remember: pass the statement as an argument")
+	}
+	// Named here rather than left to the record validator, which explains why
+	// the field matters but not what to type. A first run meets this before it
+	// has met anything else.
+	if strings.TrimSpace(*context_) == "" {
+		return fmt.Errorf(
+			"-context is required, and it is what makes the statement findable once it is separated "+
+				"from the conversation it came from. Try:\n"+
+				"  mnemosia remember -context \"why this matters and when it applies\" \"%s\"", statement)
 	}
 
 	v, err := flags.open(ctx)

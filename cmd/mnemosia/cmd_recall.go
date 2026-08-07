@@ -23,6 +23,9 @@ func runRecall(ctx context.Context, args []string) error {
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
+	if err := checkFlagOrder(fs.Args()); err != nil {
+		return err
+	}
 	query := strings.TrimSpace(strings.Join(fs.Args(), " "))
 	if query == "" {
 		return fmt.Errorf("nothing to recall: pass the query as an argument")

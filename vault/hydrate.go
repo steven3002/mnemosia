@@ -210,7 +210,11 @@ func (v *Vault) hydrateFrame(ctx context.Context, frame seal.Frame, object sia.S
 	if err := v.manifest.Append(entry); err != nil {
 		return err
 	}
-	if err := v.reclaimer.Track(object.Slab, 1, int64(len(frame.Sealed))); err != nil {
+	// Adopted, not tracked. The record is this vault's and the slab is not:
+	// another installation pinned it and is still pointing at it, so this device
+	// takes on reading and accounting for the slab without taking on the right
+	// to release it.
+	if err := v.reclaimer.Adopt(object.Slab, 1, int64(len(frame.Sealed))); err != nil {
 		return err
 	}
 	if !req.Depth.includes(HydrateMetadata) {

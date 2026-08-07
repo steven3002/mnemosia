@@ -1,0 +1,93 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+env:
+  # The model lives outside the vault directory so the cache key is about the
+  # model and nothing else.
+  MNEMOSIA_MODELS: ${{ github.workspace }}/.models
+
+jobs:
+  build:
+    name: build and test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      # I4: the product builds without cgo. A dependency that quietly needs a C
+      # toolchain is a portability failure that only shows up on someone else's
+      # machine, which is exactly the class this repository is trying to close.
+      - name: build
+        run: CGO_ENABLED=0 go build ./...
+
+      - name: vet
+        run: go vet ./...
+
+      - name: gofmt
+        run: |
+          unformatted="$(gofmt -l . | grep -v '^\.models/' || true)"
+          if [ -n "$unformatted" ]; then
+            echo "not gofmt'd:"; echo "$unformatted"; exit 1
+          fi
+
+      # Nothing here touches the network or spends storage quota. The live
+      # measurements are opt-in behind MNEMOSIA_LIVE and deliberately absent.
+      - name: test
+        run: go test ./...
+
+      # A second run with the race detector, because I5 is a claim about two
+      # processes over one vault and the in-process half of it is cheap to check.
+      - name: test (race)
+        run: go test -race ./local/... ./manifest/... ./store/... ./index/...
+
+  recall-regression:
+    name: recall regression (hit@k)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      # The model is ~130 MB and does not change between runs. Without the
+      # cache every run would re-download it; without the model the regression
+      # harness skips, and a suite that reports quality by skipping is the
+      # silence this job exists to end.
+      - name: cache the embedding model
+        id: model
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.MNEMOSIA_MODELS }}
+          key: bge-small-en-v1.5-fp32
+
+      - name: fetch the embedding model
+        if: steps.model.outputs.cache-hit != 'true'
+        run: |
+          go build -o ./mnemosia ./cmd/mnemosia
+          phrase="$(./mnemosia init -new-phrase | head -1)"
+          MNEMOSIA_PHRASE="$phrase" \
+          MNEMOSIA_HOME="$(mktemp -d)" \
+          MNEMOSIA_MODEL_DIR="$MNEMOSIA_MODELS" \
+            ./mnemosia init -offline
+
+      # The numbers, printed. hit@1/3/5/10 on the committed synthetic corpus,
+      # broken out by corpus density, so a change in ranking quality shows up as
+      # a moved number in a build log rather than as nothing at all.
+      - name: recall regression
+        run: go test ./recall/ -run 'TestRecallRegression|TestSupersededRecordsAreNotTheCurrentAnswer|TestAWrongFilterNeverEmptiesResultsAgainstTheCorpus' -v
+
+      - name: recall latency
+        run: go test ./recall/ -run TestRecallLatencyStaysInteractive -v

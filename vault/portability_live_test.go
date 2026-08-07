@@ -196,7 +196,7 @@ func TestLiveAVaultFollowsItsPhraseToASecondEnvironment(t *testing.T) {
 		t.Fatalf("environment B reproduced %d of %d memories byte-exact", exact, memories)
 	}
 
-	// Pass mark 3: the conversation, in order, with every message identical —
+	// Pass mark 3: the conversation, in order, with every message identical,
 	// and an honest account of what the head lost on the way.
 	onB, err := b.LoadSession(ctx, vault.LoadSessionRequest{ID: savedSession.ID, Transcript: true})
 	if err != nil {

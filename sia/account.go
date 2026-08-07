@@ -31,7 +31,7 @@ func (a Account) Free() uint64 {
 func (c *Client) Account(ctx context.Context) (Account, error) {
 	resp, err := c.sdk.Account(ctx)
 	if err != nil {
-		return Account{}, fmt.Errorf("read account: %w", err)
+		return Account{}, asIndexerError("read the account", c.indexer, err)
 	}
 	return Account{
 		Ready:         resp.Ready,

@@ -3,7 +3,9 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"os"
+	"strings"
 
 	"github.com/steven3002/mnemosia/keys"
 	"github.com/steven3002/mnemosia/vault"
@@ -14,6 +16,25 @@ type vaultFlags struct {
 	home    string
 	indexer string
 	offline bool
+}
+
+// checkFlagOrder rejects a flag written after the positional arguments.
+//
+// Go's flag package stops parsing at the first non-flag word, so
+// `remember "..." -offline` leaves -offline as a second piece of the statement
+// and the command goes on to fail for an unrelated reason, asking for an app
+// key the user had just said they did not want to use. Silently taking a flag
+// as prose is worse than refusing it: the run appears to be about something
+// else entirely.
+func checkFlagOrder(rest []string) error {
+	for _, arg := range rest {
+		if len(arg) > 1 && strings.HasPrefix(arg, "-") {
+			return fmt.Errorf(
+				"%q looks like a flag but comes after the text, where it is read as part of it. "+
+					"Flags go first: mnemosia <command> %s \"<text>\"", arg, arg)
+		}
+	}
+	return nil
 }
 
 func (f *vaultFlags) bind(fs *flag.FlagSet) {
@@ -45,5 +66,17 @@ func (f *vaultFlags) open(ctx context.Context) (*vault.Vault, error) {
 		}
 		opts.AppKey = appKey
 	}
-	return vault.Open(ctx, opts)
+	v, err := vault.Open(ctx, opts)
+	if err != nil {
+		return nil, err
+	}
+	// A vault that wanted the network and did not get it still works, and the
+	// user has to be told which of the two happened. Reads are answered from
+	// this device; writes are queued and owed.
+	if reason := v.OfflineBecause(); reason != nil {
+		fmt.Fprintf(os.Stderr, "warning: %v\n"+
+			"         Working from this device only. Reads are answered locally; "+
+			"anything written is queued until a run that reaches the indexer.\n", reason)
+	}
+	return v, nil
 }

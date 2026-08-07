@@ -124,13 +124,51 @@ func runStatus(ctx context.Context, args []string) error {
 	}
 	fmt.Fprintf(stderr, "quota     %s of %s used, %s free\n",
 		humanBytes(account.PinnedData), humanBytes(account.MaxPinnedData), humanBytes(account.Free()))
-	fmt.Fprintf(stderr, "slabs     %d pinned by this vault\n", len(slabs))
+	var hydrated int
+	for _, slab := range slabs {
+		if !slab.Releasable() {
+			hydrated++
+		}
+	}
+	fmt.Fprintf(stderr, "slabs     %d pinned by this device, %d hydrated from another\n",
+		len(slabs)-hydrated, hydrated)
 
 	mark, err := v.Watermark(ctx)
 	if err != nil {
 		return err
 	}
 	fmt.Fprintf(stderr, "repack    %.1f%% of quota used; %s\n", 100*mark.Used, repackAdvice(mark.Due, mark.Affordable))
+	if mark.Due {
+		fmt.Fprintf(stderr, "  ⚠ reclaimable storage has built up. Run `mnemosia reclaim -repack` to return it;\n"+
+			"    left alone it keeps accumulating until a write fails for want of room.\n")
+	}
+
+	// Storage the account pays for that this device has no record of. It is
+	// reported here because it is otherwise invisible: an ordinary sweep is
+	// bounded by the ledger and cannot see past it, so quota that will not come
+	// back looks like quota that was never freed.
+	unledgered, err := v.Unledgered(ctx)
+	if err != nil {
+		return err
+	}
+	if len(unledgered) > 0 {
+		var empty int
+		for _, slab := range unledgered {
+			if slab.Empty {
+				empty++
+			}
+		}
+		fmt.Fprintf(stderr, "unknown   %d slab(s) are billed to this account and not in this device's ledger\n",
+			len(unledgered))
+		if empty > 0 {
+			fmt.Fprintf(stderr, "          %d of them hold nothing, an interrupted write leaves exactly this; "+
+				"`mnemosia reclaim -orphans` releases them\n", empty)
+		}
+		if held := len(unledgered) - empty; held > 0 {
+			fmt.Fprintf(stderr, "          %d hold records and belong to another installation of this vault; "+
+				"reclaim them from the device that wrote them\n", held)
+		}
+	}
 	return nil
 }
 
@@ -156,6 +194,10 @@ func runReclaim(ctx context.Context, args []string) error {
 		"also release slabs the account is billed for that hold nothing, including any stranded by an installation that is gone")
 	unreadable := fs.Bool("unreadable", false,
 		"also delete objects the indexer holds but cannot open")
+	takeOwnership := fs.Bool("take-ownership", false,
+		"release storage this device hydrated rather than pinned; only when the installation that wrote it is gone for good, never when it is merely switched off")
+	releaseAll := fs.Bool("release-all", false,
+		"release this vault's storage even though the catalog is empty; only for a vault that really has been emptied, never to work around a catalog that will not load")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -166,13 +208,23 @@ func runReclaim(ctx context.Context, args []string) error {
 	}
 	defer v.Close()
 
+	opts := vault.ReclaimOptions{ReleaseAll: *releaseAll, TakeOwnership: *takeOwnership}
+
+	if *takeOwnership {
+		taken, err := v.TakeOwnership()
+		if err != nil {
+			return err
+		}
+		fmt.Fprintf(stderr, "owned     %d slab(s) hydrated from another installation are now this device's to release\n", taken)
+	}
+
 	if *repack {
 		if err := reportRepack(ctx, v); err != nil {
 			return err
 		}
 	}
 
-	sweep, err := v.Reclaim(ctx)
+	sweep, err := v.Reclaim(ctx, opts)
 	if err != nil {
 		return err
 	}
@@ -180,6 +232,23 @@ func runReclaim(ctx context.Context, args []string) error {
 		sweep.ObjectsSeen, sweep.ObjectsDeleted, sweep.SlabsReleased, took(sweep.Elapsed))
 	if sweep.Unreadable > 0 && !*unreadable {
 		fmt.Fprintf(stderr, "          %d object(s) cannot be opened; -unreadable removes them\n", sweep.Unreadable)
+	}
+	if sweep.SlabsHeld > 0 {
+		fmt.Fprintf(stderr, "          %d slab(s) left alone: another device pinned them and this one hydrated them\n",
+			sweep.SlabsHeld)
+	}
+	// A sweep that reported only what it released would say nothing about the
+	// storage it cannot reach, which is exactly the storage a user is looking
+	// for when a reclaim returns less than expected.
+	if unledgered, err := v.Unledgered(ctx); err == nil && len(unledgered) > 0 && !*orphans {
+		var empty int
+		for _, slab := range unledgered {
+			if slab.Empty {
+				empty++
+			}
+		}
+		fmt.Fprintf(stderr, "unknown   %d slab(s) billed to this account are not in this device's ledger "+
+			"and were not swept; %d hold nothing and -orphans would release them\n", len(unledgered), empty)
 	}
 
 	if *unreadable {
@@ -193,7 +262,7 @@ func runReclaim(ctx context.Context, args []string) error {
 	freed := sweep.Freed()
 	before, after := sweep.Before, sweep.After
 	if *orphans {
-		found, err := v.Orphans(ctx)
+		found, err := v.Orphans(ctx, opts)
 		if err != nil {
 			return err
 		}
@@ -206,7 +275,7 @@ func runReclaim(ctx context.Context, args []string) error {
 		fmt.Fprintf(stderr, "orphans   %d slab(s) hold nothing, %d of them unknown to this device\n",
 			len(found), stranded)
 
-		released, err := v.ReleaseOrphans(ctx)
+		released, err := v.ReleaseOrphans(ctx, opts)
 		if err != nil {
 			return err
 		}

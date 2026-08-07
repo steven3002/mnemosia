@@ -120,7 +120,7 @@ func (s *Store) SearchLexical(query string, k int) ([]record.ID, error) {
 		return nil, nil
 	}
 
-	// Every term is quoted, so a query word that happens to be FTS5 syntax —
+	// Every term is quoted, so a query word that happens to be FTS5 syntax,
 	// "or", "near", "and", is matched as a word rather than parsed as an
 	// operator. Analysis has already reduced each term to letters and digits, so
 	// a quoted term cannot carry a quote of its own and close the string early.

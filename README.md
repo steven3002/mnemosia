@@ -4,7 +4,9 @@
 
 Mnemosia gives an AI agent a long-term memory that belongs to **you** rather than to a vendor: encrypted on your device, stored on decentralized infrastructure that cannot read it, retrieved by meaning, and portable across apps, models and machines.
 
-> **Status: pre-alpha, in active development.** The storage layer is built and validated against the live Sia network, but **there is no usable release yet** and the MCP server does not exist. Nothing here is production-ready. See [Status](#status).
+> **Status: pre-alpha.** The substrate, the CLI and the MCP server are built and measured against the
+> live Sia network, and the [quickstart](#quickstart) below is tested end to end. There is no binary
+> release yet, so you build from source. See [Status](#status) for what is and is not proven.
 
 ---
 
@@ -23,13 +25,13 @@ This is **storage plumbing**, not an AI assistant. "AI" describes the *data bein
 
 ## How it works
 
-Three record types on one encrypted, content-addressed, versioned substrate:
+Two record types today on one encrypted, content-addressed, versioned substrate, with a third designed for and not yet built:
 
-| Record | What it holds | Retrieved by |
-|---|---|---|
-| `memory` | facts, preferences, learned context | **semantic** (vector) search |
-| `session` | past conversations you can resume | metadata + version |
-| `skill` | reusable procedures an agent can load | name + version |
+| Record | What it holds | Retrieved by | Built? |
+|---|---|---|---|
+| `memory` | facts, preferences, learned context | **semantic** (vector) search | yes |
+| `session` | past conversations you can resume | metadata + version | yes |
+| `skill` | reusable procedures an agent can load | name + version | not yet |
 
 Agents talk to it over **[MCP](https://modelcontextprotocol.io)** (Model Context Protocol), so any MCP-capable client can use the same memory.
 
@@ -40,24 +42,279 @@ remember ──▶ embed + encrypt locally ──▶ pack ──▶ Sia
 recall   ──▶ embed query locally ──▶ local vector search ──▶ fetch those records ──▶ decrypt locally
 ```
 
+---
+
+## Quickstart
+
+Roughly ten minutes, most of it waiting for one download and one approval click.
+
+### What you need
+
+- **Go 1.26.5 or newer** (`go.mod` sets it). `go version` should print it. If it doesn't, see
+  [Troubleshooting](#go-is-installed-but-go-version-fails).
+- **About 1 GB of free disk**: ~130 MB for the embedding model, the rest for the Go build cache.
+- **A browser**, once, to approve this installation with an indexer.
+- No Sia node. No wallet. No payment, the hosted indexer's free tier covers the quickstart.
+
+### 1. Build
+
+```sh
+git clone https://github.com/steven3002/mnemosia
+cd mnemosia
+CGO_ENABLED=0 go build -o mnemosia ./cmd/mnemosia
+CGO_ENABLED=0 go build -o mnemosia-mcp ./cmd/mnemosia-mcp
+```
+
+No cgo, no system libraries. The first build downloads dependencies and takes a few minutes.
+
+### 2. Get a recovery phrase
+
+```sh
+./mnemosia init -new-phrase
+```
+
+It prints twelve words and stores nothing. Yours will differ from every example in this file,
+the words below stand in for a real phrase and are not a working one:
+
+```
+<word1> <word2> <word3> ... <word12>
+```
+
+> ⚠️ **This phrase is the vault.** Anyone holding it can read every memory, and losing it loses the
+> data, there is no reset, because nobody else ever has the key. Write it down somewhere durable
+> before continuing.
+
+Put it in your environment. It is read on every run and never written to disk:
+
+```sh
+export MNEMOSIA_PHRASE="<the twelve words init printed>"
+```
+
+### 3. Approve this installation
+
+Storing on Sia needs an **app key**, which an indexer issues after you approve it in a browser.
+
+```sh
+./mnemosia connect -out mnemosia.key
+```
+
+It prints a link. Open it, approve, and come back:
+
+```
+Connecting to https://sia.storage
+This needs one approval in a browser. The link below expires after about ten
+minutes; a fresh one is issued automatically until you approve or the budget runs out.
+
+  approve this: https://sia.storage/approve?...
+
+  waiting...
+```
+
+Then load the key it wrote:
+
+```sh
+export MNEMOSIA_APP_KEY="$(cat mnemosia.key)"
+```
+
+**Two things about this step are worth knowing in advance**, because both look like failures:
+
+- **The link expires after about ten minutes.** If you go and find a browser and the link is dead,
+  `connect` has already issued a fresh one, use the newest link it printed.
+- **Approval is not readiness.** After you approve, the indexer funds host accounts, which took
+  **~16 s** when we measured it. `connect` waits for that on your behalf. If you skip `connect` and
+  write immediately, the write fails with an error about *hosts*, which says nothing about waiting.
+
+`mnemosia.key` is a secret. It is written `0600` and it belongs in `.gitignore`.
+
+### 4. Prepare the vault
+
+```sh
+./mnemosia init
+```
+
+```
+preparing vault in /home/you/.mnemosia
+  keys derived, model loaded, device store ready in 9.00 s
+  connected: https://sia.storage
+  quota:     40.00 MiB used of 46.57 GiB (46.53 GiB free)
+```
+
+The first run downloads the embedding model (~130 MB, once).
+
+### 5. Remember something
+
+```sh
+./mnemosia remember \
+  -context "Recorded while checking the README quickstart from a clean environment." \
+  -tags "sia,storage" \
+  "Sia bills a slab whole, so packing many records into one slab is a cost decision rather than an optimisation."
+```
+
+```
+<record id>
+  cid       <content id>
+  embed     940 ms
+  seal      1 ms
+  on Sia    420 B in 1 object(s), 1 slab(s)
+            upload 4.49 s · pin slabs 196 ms · pin objects 158 ms
+```
+
+> **`-context` is required, and flags come before the text.** The context is what makes a statement
+> findable once it is separated from the conversation it came from; leaving it out measurably costs
+> retrieval quality, and records are immutable, so it cannot be added later. And because Go's flag
+> parsing stops at the first plain word, `remember "..." -offline` reads `-offline` as part of your
+> sentence.
+
+### 6. Recall it by meaning
+
+```sh
+./mnemosia recall "how is storage billed"
+```
+
+```
+  embed 383 ms · search 0.74 ms over 1 vector(s) and 1 term match(es) · fetch 8 ms
+1. [0.6257] Sia bills a slab whole, so packing many records into one slab is a cost decision rather than an optimisation.
+   context: Recorded while checking the README quickstart from a clean environment.
+   <record id> · fact · sia, storage · from local in 8 ms
+```
+
+Note the query shares no words with the record beyond "billed"/"bills", the match is semantic.
+
+### 7. Connect an MCP client
+
+`mnemosia-mcp` speaks MCP over stdio. For Claude Code:
+
+```sh
+claude mcp add mnemosia \
+  -e MNEMOSIA_PHRASE="$MNEMOSIA_PHRASE" \
+  -e MNEMOSIA_APP_KEY="$MNEMOSIA_APP_KEY" \
+  -- /absolute/path/to/mnemosia-mcp
+```
+
+Other hosts take a JSON config naming the same binary and the same two environment variables. We
+have verified the command above on Claude Code 2.1.223; **we have not verified the config file
+locations for Cursor, VS Code or Claude Desktop**, so this README does not guess at them.
+
+The server exposes `remember`, `recall`, `open`, `forget`, `save_session`, `resume_session` and a
+`/resume` prompt. Two clients can run against one vault at once, each in its own process.
+
+### Trying it without Sia
+
+Every command takes `-offline`, which uses the device's own copy and contacts no indexer. It needs
+no app key and no approval, so it is the fastest way to see recall working:
+
+```sh
+./mnemosia init -offline
+./mnemosia remember -offline -context "..." "..."
+./mnemosia recall -offline "..."
+```
+
+Records written offline stay on the device until a connected run flushes them.
+
+---
+
+## "Saved" is not "on Sia"
+
+Mnemosia distinguishes the two everywhere, because the gap between them is real and can be up to an
+hour under the standing flush cadence:
+
+- **On this device**, the record is sealed and durable locally the moment `remember` returns.
+- **On Sia**, the record is on the network, and only a completed flush puts it there.
+
+`remember` says which it achieved (`on Sia 420 B in 1 object(s)` versus `on Sia not yet, held on
+this device, 1 record(s) queued`), `mnemosia status` reports what is still queued, and `mnemosia
+flush` closes the gap on demand. **No output claims durability on Sia before a flush has
+completed.**
+
+## Storage, quota and reclaiming
+
+Sia bills a **slab** whole, 40 MiB, whether it holds one record or a thousand, and a partly filled
+slab can never be extended. So every flush strands a slab, and an account fills up over months no
+matter how little you actually store.
+
+```sh
+./mnemosia status          # what is held, what is queued, what is billed
+./mnemosia reclaim         # release storage nothing points at any more
+./mnemosia reclaim -repack # rewrite live records into fewer slabs first
+```
+
+`status` warns you once reclaimable storage has built up, rather than leaving you to find out when a
+write fails. Reclamation is two-phase and refuses to run on a keep-set that does not account for
+everything the vault holds, an empty keep-set means the computation is wrong, not that the data is
+dead.
+
+---
+
 ## Status
 
-The storage substrate and a command-line interface over it are built and measured against the live
-network. The MCP server and the viewer are not.
-
 **Working, and measured against live Sia:**
+
 - End-to-end round-trip, byte-exact, with client-side encryption
 - A thousand records written into one storage slab, and any one of them read back on its own
 - A vault rebuilt from the recovery phrase and the indexer with its catalog deleted
+- A vault **hydrated onto a machine that has never held it**, and read there
 - Reclamation that returns exactly the space it should and nothing that is still in use
-- Repack that rewrites every storage location without disturbing a single record identity
+- Repack that rewrites every storage location without disturbing a single record identity, including
+  **while a second process is writing to the same vault**
+- An interrupted repack loses no data
 - Three-tier reads, from the device's own copy through a cached location to a cold fetch
-- Semantic recall quality on a labelled evaluation corpus
+- Sessions saved on one machine and resumed on another
+- An MCP server two different clients, on two different protocol revisions, drive at once
 
-**Not yet built:** the MCP server and the local viewer. Retrieval currently ranks by meaning alone —
-metadata filtering is specified but deliberately not applied yet.
+**Not yet built:** the `skill` record type, the local viewer, session forking.
 
-There is **no install path yet.** Watch the repository or the [CHANGELOG](CHANGELOG.md) for the first release.
+**Stated plainly, because it would be easy to imply otherwise:**
+
+- **A resumed session is not the session.** A session head rebuilt from its stored chunks recovers
+  the transcript byte for byte, but **11 of its 26 fields** come back; the summary, tags, project and
+  lineage do not.
+- **Opening a vault on a second machine needs the phrase *and* one browser approval.** The phrase
+  alone is not sufficient, and we do not claim seed-only recovery.
+- **Cost figures we quote are advertised rates, not invoices.** The free tier has covered everything
+  so far; we have never paid a bill.
+- **Recall quality numbers come from synthetic corpora**, not from a real personal vault.
+
+## Troubleshooting
+
+#### Go is installed but `go version` fails
+
+Go is often somewhere other than `/usr/local/go`, a toolchain manager, a package manager, or a
+per-user install under `~/.local`. Find it and put it on `PATH`:
+
+```sh
+command -v go || ls ~/.local/**/go/bin/go /usr/lib/go*/bin/go 2>/dev/null
+export PATH="/path/to/go/bin:$PATH"
+```
+
+#### The build fails with "no space left on device"
+
+The Go build cache and the model download both land in temporary space, and a full `/tmp` fails in
+ways that read as compiler errors. Point them somewhere with room:
+
+```sh
+export TMPDIR="$HOME/.tmp" && mkdir -p "$TMPDIR"
+```
+
+#### "no recovery phrase"
+
+Set `MNEMOSIA_PHRASE`, or pipe the phrase on stdin. If you do not have one, `mnemosia init
+-new-phrase` prints one and stores nothing.
+
+#### "no Sia app key"
+
+You have not completed step 3, or the key is not in the environment. Run `mnemosia connect -out
+mnemosia.key` and `export MNEMOSIA_APP_KEY="$(cat mnemosia.key)"`. To work without an indexer
+entirely, pass `-offline`.
+
+#### An error about hosts, or "not enough hosts"
+
+The indexer has not finished funding host accounts. `mnemosia connect` waits for this; if you
+skipped it, wait a minute and retry. The first write of any process waits for readiness on its own.
+
+#### "not found" or a 502 from the indexer
+
+The hosted indexer sits behind a CDN that occasionally returns a gateway error. These are transient
+and retryable; nothing is lost, because a failed flush leaves the records queued on the device.
 
 ## Design principles
 
@@ -75,8 +332,7 @@ There is **no install path yet.** Watch the repository or the [CHANGELOG](CHANGE
 
 ## Contributing
 
-Early and in flux: the architecture is settled and the storage layer is written, but the surfaces
-above it are not. See [CONTRIBUTING.md](CONTRIBUTING.md). Bug reports and design discussion are
+Early and in flux. See [CONTRIBUTING.md](CONTRIBUTING.md). Bug reports and design discussion are
 welcome; please open an issue before a large pull request.
 
 ## Security
