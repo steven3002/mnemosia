@@ -173,7 +173,7 @@ func (v *Vault) recoverFrame(ctx context.Context, frame seal.Frame, object sia.S
 //
 // A chunk carries no vector and no ranking metadata: it is never searched, and
 // the summary that is searched lives on the head. The head itself is not
-// recoverable this way at all — it is the one record that is never packed into a
+// recoverable this way at all, it is the one record that is never packed into a
 // slab, so a vault rebuilt from the indexer alone gets its transcripts back and
 // not the sessions that name them. Each chunk records the session it belongs to,
 // so what a rebuild recovers is enough to reconstruct a head, which nothing does

@@ -43,7 +43,7 @@ type SessionQuery struct {
 	// Project matches the session's project key exactly.
 	Project string
 	// Tags requires every listed tag. A listing is a browse and not a ranked
-	// search, so this one is an ordinary filter — the reason ranking's filters
+	// search, so this one is an ordinary filter, the reason ranking's filters
 	// only ever prefer is that a *ranked* answer must never come back empty
 	// because a guess was wrong, and a listing's caller is not guessing.
 	Tags []string
@@ -58,7 +58,7 @@ type SessionQuery struct {
 // ErrStaleHead reports that a session head changed under a writer.
 //
 // It is the one place the vault has a lost-update problem to solve. Appending
-// to a session is read the head, write chunks, write the head back — and the
+// to a session is read the head, write chunks, write the head back, and the
 // middle step reaches the network, so it cannot be held inside a transaction.
 // Several processes share one vault by design, so the guard is a version check
 // rather than a lock: a writer that lost the race is told, instead of silently
@@ -70,7 +70,7 @@ var ErrStaleHead = errors.New("the session was changed by another writer")
 //
 // A zero expected version means the session is being created and must not
 // already exist. The head is the one mutable record the vault holds, and it is
-// written whole on every append — affordable precisely because it is small: the
+// written whole on every append, affordable precisely because it is small: the
 // transcript it describes is somewhere else and stays there.
 func (s *Store) PutSessionHead(session *record.Session, head []byte, expect int64) error {
 	var parent any
@@ -259,8 +259,8 @@ const DefaultSessionLimit = 100
 
 // ProjectKey is the single string a session is filed under.
 //
-// A repository is the stronger identity — the same checkout moves between
-// directories and the same directory is reused for different work — so it wins
+// A repository is the stronger identity, the same checkout moves between
+// directories and the same directory is reused for different work, so it wins
 // where both are present.
 func ProjectKey(project record.Project) string {
 	switch {

@@ -267,7 +267,7 @@ func TestAVaultWrittenBeforeSessionsGainsTheKindColumn(t *testing.T) {
 }
 
 // A session ranks on its own metadata, under its own class, in the same tables
-// memories use — which is what puts both in one ranked list.
+// memories use, which is what puts both in one ranked list.
 func TestASessionIsDescribedUnderItsOwnKind(t *testing.T) {
 	store := openStore(t)
 	session := sessionID(t, 5)

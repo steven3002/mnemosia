@@ -19,7 +19,7 @@ var ErrStaleLocation = errors.New("cached object location is stale")
 // A SlabLocation is the part of an object's location that every object packed
 // into the same slab shares: the coding parameters and the sector list.
 //
-// It is the bulk of the metadata — thirty sectors of root and host key — and
+// It is the bulk of the metadata, thirty sectors of root and host key, and
 // keeping one copy per slab rather than one per object is the difference
 // between a cache that grows with records and one that grows with flushes.
 type SlabLocation struct {
@@ -67,7 +67,7 @@ func splitLocation(ref ObjectRef, sealed slabs.SealedObject) (Location, []SlabLo
 // The reassembled metadata is verified before use, twice over. Structurally,
 // because the SDK's slab reader checks its bounds before it filters unusable
 // hosts and then indexes the empty result from a goroutine the caller cannot
-// recover — a sufficiently decayed sector list does not slow a read down, it
+// recover, a sufficiently decayed sector list does not slow a read down, it
 // ends the process. Cryptographically, because an object's identity is derived
 // from the slabs it points at, so a mismatched reassembly fails to open rather
 // than quietly reading the wrong bytes.

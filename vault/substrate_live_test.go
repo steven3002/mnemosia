@@ -48,6 +48,37 @@ func liveVaultAt(t *testing.T, home string) *vault.Vault {
 	return v
 }
 
+// releaseVaultAt reopens a vault directory and releases what it holds.
+//
+// It exists for tests that close a vault before they finish. A cleanup that
+// captured the closed handle would panic on a nil catalog and never reach the
+// reclamation, which turns a test bug into a slab that bills forever.
+func releaseVaultAt(t *testing.T, home string) {
+	t.Helper()
+	phrase, err := keys.ReadPhrase(nil)
+	if err != nil {
+		t.Errorf("recovery phrase: %v", err)
+		return
+	}
+	appKey, err := keys.AppKeyFromEnv()
+	if err != nil {
+		t.Errorf("app key: %v", err)
+		return
+	}
+	v, err := vault.Open(context.Background(), vault.Options{
+		Home:    home,
+		Phrase:  phrase,
+		AppKey:  appKey,
+		Indexer: vault.DefaultIndexer(),
+	})
+	if err != nil {
+		t.Errorf("reopen %s to release its storage: %v", home, err)
+		return
+	}
+	defer v.Close()
+	releaseVault(t, v)
+}
+
 // releaseVault returns everything a test wrote. It runs whatever happened, so
 // a failure costs a report rather than a slab left billing forever.
 func releaseVault(t *testing.T, v *vault.Vault) {
@@ -293,7 +324,7 @@ func TestLiveRecoveryWithoutTheManifest(t *testing.T) {
 }
 
 // Pass mark 5: reclaim frees exactly what it should and nothing that is still
-// live, including the case that makes it interesting — a slab shared between
+// live, including the case that makes it interesting, a slab shared between
 // records that are being dropped and records that are not.
 func TestLiveReclaimFreesExactlyTheDeadSlabs(t *testing.T) {
 	v := liveVaultAt(t, t.TempDir())
@@ -417,7 +448,7 @@ func TestLiveReclaimFreesExactlyTheDeadSlabs(t *testing.T) {
 // An account can hold objects this vault knows nothing about: another vault
 // under the same app key, an older tool, a marker somebody left deliberately.
 // Reasoning from "everything the catalog does not name" would delete all of
-// them, and deletion here is not recoverable — the object entry is the only
+// them, and deletion here is not recoverable, the object entry is the only
 // thing that turns a slab into readable bytes. So the ledger of what this vault
 // pinned is what bounds a sweep, and this is the test that says so.
 //

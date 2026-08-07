@@ -43,6 +43,9 @@ type Vault struct {
 	// ownsEmbedder records whether this vault loaded the model itself, which is
 	// what decides whether closing the vault may close it.
 	ownsEmbedder bool
+	// ready records that the indexer has been seen able to accept a write, so
+	// the check that gates the first one is not repeated on every later one.
+	ready        atomic.Bool
 	sessionStats sessionCounters
 }
 
@@ -319,8 +322,8 @@ func (v *Vault) StartFlushing(ctx context.Context, onError func(error)) {
 // stay on this device and are written by a later run.
 //
 // Closing twice is a no-op rather than an error. A caller that defers a close
-// and also closes explicitly — which is what any code path that wants to prove
-// something survives the vault has to do — should not be reporting failures
+// and also closes explicitly, which is what any code path that wants to prove
+// something survives the vault has to do, should not be reporting failures
 // from the second one.
 func (v *Vault) Close() error {
 	var errs []error
@@ -379,7 +382,42 @@ func (v *Vault) WaitReady(ctx context.Context, budget time.Duration) (sia.Accoun
 	if v.client == nil {
 		return sia.Account{}, errOffline
 	}
-	return v.client.WaitReady(ctx, budget)
+	account, err := v.client.WaitReady(ctx, budget)
+	if err == nil {
+		v.ready.Store(true)
+	}
+	return account, err
+}
+
+// FirstWriteBudget is how long a vault waits for a freshly approved account to
+// become usable before giving up.
+//
+// Funding host accounts was measured at about sixteen seconds. The budget is
+// generously above it because the cost of waiting too long is a slow first run
+// and the cost of not waiting is a failed one, reported as an error about hosts
+// that gives the reader nothing to act on.
+const FirstWriteBudget = 90 * time.Second
+
+// awaitFirstWrite holds the first flush of a process until the indexer has
+// funded enough host accounts to accept it.
+//
+// Approval and readiness are two different events, and the gap between them is
+// the first thing a new device meets. Without this the very first write after
+// onboarding fails, with an error that names hosts and does not say to wait —
+// which is the shape of failure that makes a user conclude the product is broken
+// rather than busy.
+//
+// It runs once. After the account has been seen ready it stays ready, and a
+// per-flush round trip would be a network call on the path this system works
+// hardest to keep short.
+func (v *Vault) awaitFirstWrite(ctx context.Context) error {
+	if v.client == nil || v.ready.Load() {
+		return nil
+	}
+	if _, err := v.WaitReady(ctx, FirstWriteBudget); err != nil {
+		return err
+	}
+	return nil
 }
 
 // Pending reports how many records are held on this device but not yet written

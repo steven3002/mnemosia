@@ -10,7 +10,7 @@ import (
 
 // A RecordQuery lists records by their metadata rather than by meaning.
 //
-// Every filter here is an ordinary one — it excludes. That is the opposite of
+// Every filter here is an ordinary one, it excludes. That is the opposite of
 // what ranking's filters do, and the difference is not an inconsistency: a
 // ranked answer must never come back empty because an agent guessed a tag
 // wrongly from the wording of a question, whereas a caller asking to see the
@@ -50,7 +50,7 @@ const MaxRecordLimit = 200
 
 // A Cursor is an opaque position in a listing.
 //
-// It is opaque on purpose. The alternative — an offset — is not stable across
+// It is opaque on purpose. The alternative, an offset, is not stable across
 // writes: a record added between two pages shifts every row after it, so a
 // caller paging through a vault that is being written to sees an entry twice or
 // not at all. A keyset cursor names the last row seen, so the next page starts

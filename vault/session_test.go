@@ -67,7 +67,7 @@ func conversation(prefix string) []record.Message {
 }
 
 // Pass mark 1. A session is saved, reloaded, and the message sequence comes
-// back intact — the tool call still correlated to its result by id, and every
+// back intact, the tool call still correlated to its result by id, and every
 // provider field still byte for byte what went in.
 func TestASessionReloadsWithItsToolCallsAndProviderFieldsIntact(t *testing.T) {
 	v := offlineVault(t)
@@ -323,7 +323,7 @@ func TestAppendingCreatesANewVersionWithoutRewritingPriorChunks(t *testing.T) {
 // The separation is a scope and not a filter, and the two are different
 // mechanisms on purpose: a filter is a guess an agent makes about what an answer
 // will be about, and must never cost an answer; a scope is a caller stating
-// which container it is addressing. This asserts both halves — that an unscoped
+// which container it is addressing. This asserts both halves, that an unscoped
 // query ranks the two kinds together, and that a scoped one returns only what
 // was asked for.
 func TestRecallFindsASessionBySummaryAndScopeSeparatesTheKinds(t *testing.T) {
@@ -430,7 +430,7 @@ func TestRecallFindsASessionBySummaryAndScopeSeparatesTheKinds(t *testing.T) {
 }
 
 // Pass mark 5. A memory extracted during a session resolves back to that
-// session and to the turns it came from — and the session names the memory in
+// session and to the turns it came from, and the session names the memory in
 // return.
 func TestAMemoryResolvesBackToItsSessionAndTurnSpan(t *testing.T) {
 	v := offlineVault(t)
@@ -769,7 +769,7 @@ func TestAnAppendOntoAStaleHeadIsRefusedRatherThanLosingTurns(t *testing.T) {
 	}
 
 	// The first process is holding a head that has moved on. It reads the head
-	// afresh on every save, so this succeeds — and the point of the guard is
+	// afresh on every save, so this succeeds, and the point of the guard is
 	// that when it does not, it says so.
 	if _, err := writer.SaveSession(ctx, vault.SaveSessionRequest{
 		ID: saved.ID, Messages: conversation("w3"),

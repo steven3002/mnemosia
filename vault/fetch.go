@@ -18,7 +18,7 @@ import (
 //
 // A session head is answered from this device and nothing else, because a head
 // is never packed into a slab: it changes on every append, and slabs hold
-// immutable content. Everything else — memories, transcript chunks — is
+// immutable content. Everything else, memories, transcript chunks, is
 // resolved through the three storage tiers.
 func (v *Vault) Fetch(ctx context.Context, id record.ID) (recall.Found, recall.Tier, error) {
 	if session, err := v.session(id); err == nil {
@@ -285,3 +285,19 @@ func (v *Vault) LocalBody(id record.ID) ([]byte, error) { return v.local.GetBody
 // ForgetLocally drops this device's copy of a record without touching the
 // network, so a read can be forced down to the tiers below.
 func (v *Vault) ForgetLocally(id record.ID) error { return v.local.ForgetBody(id) }
+
+// CountBodies reports how many records this device is holding a copy of.
+//
+// It is the difference between a vault that has been catalogued and one that has
+// been downloaded, which is a distinction a hydration has to be able to state
+// rather than assert.
+func (v *Vault) CountBodies() (int, error) { return v.local.CountBodies() }
+
+// ForgetSessionHead drops this device's copy of a session head, leaving the
+// transcript where it is.
+//
+// It is the head's counterpart to ForgetLocally, and it has no tier below it to
+// fall to: a head is never packed into a slab, so the only way back from here is
+// to rebuild one from the chunks. That asymmetry is the whole of what
+// RebuildSessions exists to measure.
+func (v *Vault) ForgetSessionHead(id record.ID) error { return v.local.ForgetSessionHead(id) }

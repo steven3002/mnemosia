@@ -24,6 +24,8 @@ func main() {
 	switch os.Args[1] {
 	case "init":
 		err = runInit(ctx, os.Args[2:])
+	case "connect":
+		err = runConnect(ctx, os.Args[2:])
 	case "remember":
 		err = runRemember(ctx, os.Args[2:])
 	case "recall":
@@ -36,6 +38,8 @@ func main() {
 		err = runReclaim(ctx, os.Args[2:])
 	case "recover":
 		err = runRecover(ctx, os.Args[2:])
+	case "hydrate":
+		err = runHydrate(ctx, os.Args[2:])
 	case "help", "-h", "--help":
 		usage()
 		return
@@ -73,6 +77,7 @@ func usage() {
 	fmt.Fprint(os.Stderr, `mnemosia, user-owned storage for an AI's memory, on Sia
 
 usage:
+  mnemosia connect -out <file>       approve this installation with an indexer
   mnemosia init                      derive keys, prepare the vault, connect
   mnemosia remember "<statement>"    store a memory
   mnemosia recall "<query>"          retrieve memories by meaning
@@ -80,6 +85,7 @@ usage:
   mnemosia status                    what is held, what is queued, what is billed
   mnemosia reclaim                   release storage nothing points at any more
   mnemosia recover                   rebuild this vault from the phrase and the indexer
+  mnemosia hydrate                   restore this vault on a machine that never held it
 
 environment:
   MNEMOSIA_PHRASE     BIP-39 recovery phrase; read from stdin when unset

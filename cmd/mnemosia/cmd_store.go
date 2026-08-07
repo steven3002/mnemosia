@@ -86,7 +86,7 @@ func runStatus(ctx context.Context, args []string) error {
 		humanBytes(uint64(vectors.BaseBytes)), humanBytes(uint64(vectors.DeltaBytes)), vectors.Compactions)
 	// A mixed index is reported rather than passed over. Vectors from two models
 	// cannot be compared, so the ones from the other model are simply not
-	// searched — which looks exactly like the vault having become worse at
+	// searched, which looks exactly like the vault having become worse at
 	// recall unless it is said out loud.
 	if health.Mixed() {
 		fmt.Fprintf(stderr, "  ⚠ %d vector(s) are from another model and are NOT searchable:\n", health.Stale())
@@ -215,7 +215,7 @@ func runReclaim(ctx context.Context, args []string) error {
 		after = released.After
 	}
 
-	fmt.Fprintf(stderr, "quota     %s used before, %s after — freed %s\n",
+	fmt.Fprintf(stderr, "quota     %s used before, %s after, freed %s\n",
 		humanBytes(before.PinnedData), humanBytes(after.PinnedData), humanBytes(freed))
 	return nil
 }

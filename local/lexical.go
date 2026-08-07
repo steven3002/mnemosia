@@ -11,8 +11,8 @@ import (
 // LexicalText is the text the lexical index holds for one record.
 //
 // It is the same material the vector pass reads, plus the tags and keywords the
-// agent supplied. Those two are lexical by nature — an agent writes them as the
-// words it expects to be searched for — so they earn their place in a term index
+// agent supplied. Those two are lexical by nature, an agent writes them as the
+// words it expects to be searched for, so they earn their place in a term index
 // even though the embedded text deliberately leaves them out.
 func LexicalText(m *record.Memory) string {
 	parts := make([]string, 0, 4)
@@ -30,7 +30,7 @@ func LexicalText(m *record.Memory) string {
 }
 
 // Terms reduces text to the terms the lexical index compares, which is how a
-// caller can tell whether a query and a record share any word at all — the
+// caller can tell whether a query and a record share any word at all, the
 // question that decides whether a lexical signal has anything to contribute.
 func Terms(text string) []string { return analyze(text) }
 
@@ -121,7 +121,7 @@ func (s *Store) SearchLexical(query string, k int) ([]record.ID, error) {
 	}
 
 	// Every term is quoted, so a query word that happens to be FTS5 syntax —
-	// "or", "near", "and" — is matched as a word rather than parsed as an
+	// "or", "near", "and", is matched as a word rather than parsed as an
 	// operator. Analysis has already reduced each term to letters and digits, so
 	// a quoted term cannot carry a quote of its own and close the string early.
 	quoted := make([]string, len(terms))

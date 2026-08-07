@@ -78,8 +78,8 @@ func (c *Client) WalkObjectsStats(ctx context.Context, fn func(StoredObject) err
 		// The listing is read through the indexer client rather than the SDK's
 		// wrapper because the wrapper opens every object in the page and fails
 		// the whole call if any one of them will not open. An account can hold
-		// such an object — unpinning a slab out from under a live object leaves
-		// exactly that — and one of them must not cost the account its ability
+		// such an object, unpinning a slab out from under a live object leaves
+		// exactly that, and one of them must not cost the account its ability
 		// to enumerate itself.
 		events, err := c.app.ListObjects(ctx, c.appKey, cursor, EnumeratePageSize)
 		if err != nil {

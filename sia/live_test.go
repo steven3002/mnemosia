@@ -66,7 +66,7 @@ func pinBatch(t *testing.T, client *sia.Client, count, size int) (*sia.Batch, []
 // release returns a test's storage in the order that keeps the account
 // healthy: objects first, then the slab underneath them.
 //
-// The reverse order does not merely leak — it leaves objects that can never be
+// The reverse order does not merely leak, it leaves objects that can never be
 // opened again, and the account keeps returning them forever.
 func release(t *testing.T, client *sia.Client, batch *sia.Batch) {
 	t.Helper()
@@ -188,8 +188,8 @@ func listedOrNot(listed bool) string {
 // TestLiveEnumerateObjects establishes what a walk from the zero cursor
 // actually returns.
 //
-// The indexer's listing is documented as a change feed — objects updated after
-// a cursor — not as a listing of everything. Recovery without a catalog stands
+// The indexer's listing is documented as a change feed, objects updated after
+// a cursor, not as a listing of everything. Recovery without a catalog stands
 // or falls on whether a zero cursor reaches every object, so this measures it
 // rather than assuming it: write a batch, enumerate from zero, and require
 // every one of the new objects to appear.
@@ -308,7 +308,7 @@ func TestLiveEnumerateSeesDeletions(t *testing.T) {
 // The blast radius is the reason this is a test rather than a comment. The
 // SDK's own listing helper opens every object in a page and fails the whole
 // call if one of them will not open, so a single stranded object is enough to
-// stop an account enumerating itself at all — which is the one thing recovery
+// stop an account enumerating itself at all, which is the one thing recovery
 // without a catalog depends on.
 func TestLiveUnpinBeforeDeleteStrandsObjects(t *testing.T) {
 	client := liveClient(t)

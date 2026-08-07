@@ -86,7 +86,7 @@ func (s *Store) Describe(ids []record.ID) (Described, error) {
 
 	// A record is superseded when some other record names it. The edge is
 	// stored on the replacement, so this asks which candidates are pointed at
-	// rather than reading a flag on the candidate itself — which is what keeps
+	// rather than reading a flag on the candidate itself, which is what keeps
 	// the vault append-only: marking the old record would mean rewriting a body
 	// that is already immutable and already on the network.
 	supRows, err := s.db.Query(

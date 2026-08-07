@@ -54,7 +54,7 @@ type SaveSessionRequest struct {
 	//
 	// It is off by default and that is a deliberate decision rather than an
 	// oversight. Every flush mints a whole slab whatever it holds, so forcing
-	// one per append would bill forty mebibytes for a turn — a conversation
+	// one per append would bill forty mebibytes for a turn, a conversation
 	// appended to two hundred times would consume eight gibibytes of a
 	// forty-six gibibyte allowance, for a transcript of a few hundred
 	// kilobytes. The ordinary cadence leaves a window of up to an hour in which
@@ -278,8 +278,8 @@ func applyHeadUpdates(session *record.Session, req SaveSessionRequest) {
 // validateAppend checks a batch before any of it is sealed.
 //
 // Uniqueness is checked within the batch and against the boundaries the head
-// already knows, which catches the mistake that actually happens — a caller
-// resending turns it has already saved — without reading back the transcript.
+// already knows, which catches the mistake that actually happens, a caller
+// resending turns it has already saved, without reading back the transcript.
 // It does not prove uniqueness across the whole session; doing that would mean
 // fetching every chunk on every append, which is the cost this shape exists to
 // avoid.

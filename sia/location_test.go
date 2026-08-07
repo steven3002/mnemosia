@@ -169,7 +169,7 @@ func TestSplittingLocationsIsWhatMakesTheCacheAffordable(t *testing.T) {
 	}
 
 	deduped := object + shared
-	t.Logf("%d objects over one slab: %d B cached naively (%d B/object), %d B split (%.0f B/object) — %.0fx smaller",
+	t.Logf("%d objects over one slab: %d B cached naively (%d B/object), %d B split (%.0f B/object), %.0fx smaller",
 		objects, naive, naive/objects, deduped, float64(deduped)/objects, float64(naive)/float64(deduped))
 
 	// What is left per object is almost entirely irreducible: two signatures of

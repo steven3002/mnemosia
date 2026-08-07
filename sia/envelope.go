@@ -12,8 +12,8 @@ import (
 // Cached location metadata is written in a fixed binary layout rather than as
 // JSON.
 //
-// Every field here is a hash, a key or a signature — bytes with no textual
-// meaning — and a hex or base64 rendering doubles the size of the one thing a
+// Every field here is a hash, a key or a signature, bytes with no textual
+// meaning, and a hex or base64 rendering doubles the size of the one thing a
 // vault keeps a copy of per record. The layout is versioned so that a change
 // invalidates old entries instead of misreading them, which costs one re-fetch
 // and is what a cache is for.

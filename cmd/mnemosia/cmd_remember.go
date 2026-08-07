@@ -107,7 +107,7 @@ func reportAdvice(result vault.RememberResult) {
 		case tag.New:
 			fmt.Fprintf(stderr, "  tag       %-20s new to this vault\n", tag.Tag)
 		case tag.TooCommon:
-			fmt.Fprintf(stderr, "  tag       %-20s on %d of %d records (%.0f%%) — too common to narrow a search\n",
+			fmt.Fprintf(stderr, "  tag       %-20s on %d of %d records (%.0f%%), too common to narrow a search\n",
 				tag.Tag, tag.Records, result.Tags.Records, 100*tag.Share)
 		default:
 			fmt.Fprintf(stderr, "  tag       %-20s on %d of %d records\n",

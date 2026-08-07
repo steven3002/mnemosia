@@ -18,7 +18,7 @@ func vectorFrom(t *testing.T, model string, dim int) index.Entry {
 
 // The failure being guarded is silent: a cosine between vectors from two models
 // is meaningless but is still a number, so a half-re-embedded vault ranks
-// confidently and wrongly. Detection is the whole point — searching only the
+// confidently and wrongly. Detection is the whole point, searching only the
 // usable subset is already safe, but doing it without saying so is
 // indistinguishable from the vault simply having become worse at recall.
 func TestAMixedModelIndexIsDetected(t *testing.T) {

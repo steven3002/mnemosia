@@ -34,8 +34,8 @@ type LoadSessionRequest struct {
 	// Off by default. A sub-agent transcript is a session in its own right and
 	// can be as large as its parent, so inlining every one of them turns a
 	// bounded read into an unbounded one. A load that omitted them entirely
-	// would be worse still — it would return an incomplete account of what
-	// happened — so they are always named.
+	// would be worse still, it would return an incomplete account of what
+	// happened, so they are always named.
 	IncludeSubagents bool
 }
 
@@ -146,7 +146,7 @@ func (v *Vault) transcript(ctx context.Context, session *record.Session, req Loa
 //
 // The head records the message ids at each chunk's two ends, so a replay
 // resuming from a chunk boundary skips every chunk before it without reading
-// one — which is the case that matters, because it is where a previous page
+// one, which is the case that matters, because it is where a previous page
 // stopped when the page size and the chunk size agree.
 //
 // A message strictly inside a chunk cannot be located from the boundaries, and
@@ -167,7 +167,7 @@ func startChunk(session *record.Session, from string) int {
 	// The message is strictly inside a chunk, and the boundaries cannot say
 	// which. Starting at the beginning is the only answer available without
 	// having already read the transcript, and the walk through the chunks
-	// settles it — including the case where the message is not there at all.
+	// settles it, including the case where the message is not there at all.
 	return 0
 }
 

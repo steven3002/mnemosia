@@ -3,7 +3,7 @@
 // It speaks stdio, which is the transport the specification directs a local
 // server to use and the one with no listening socket at all: the plaintext never
 // leaves the device, and there is nothing on the network to attack. Nothing but
-// protocol traffic goes to stdout — every diagnostic goes to stderr, which is
+// protocol traffic goes to stdout, every diagnostic goes to stderr, which is
 // the channel hosts read and display.
 package main
 
@@ -47,7 +47,7 @@ func main() {
 // A server that refuses to start tells the model nothing: the host reports a
 // failed connection and the user is left guessing. One that starts and answers
 // every call with what to do about it gives them a sentence they can act on,
-// which is what the specification asks for — an unconfigured server is a tool
+// which is what the specification asks for, an unconfigured server is a tool
 // execution error, not a protocol error. The guide reads either way, because it
 // is the one thing a caller that cannot reach its vault still needs.
 func serve(ctx context.Context) (*mcp.Server, func()) {
@@ -73,7 +73,7 @@ func serve(ctx context.Context) (*mcp.Server, func()) {
 func open(ctx context.Context) (*vault.Vault, error) {
 	// The phrase comes from the environment and never from stdin. stdin is the
 	// protocol transport here, so the command line's fallback would consume the
-	// client's first message — and neither secret is ever a flag, because a flag
+	// client's first message, and neither secret is ever a flag, because a flag
 	// lands in the process table and in shell history.
 	phrase, err := keys.ReadPhrase(nil)
 	if err != nil {

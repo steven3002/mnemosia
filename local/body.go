@@ -72,6 +72,36 @@ func (s *Store) ForgetBody(id record.ID) error {
 	return nil
 }
 
+// BodyIDsOfKind lists the records of one class that this device holds.
+//
+// It reads the kind column beside the body rather than any of the metadata
+// tables, which is what makes it usable for the one record class that has no
+// metadata: a transcript chunk is never ranked and never listed, so nothing else
+// in the store knows the device has one.
+func (s *Store) BodyIDsOfKind(kind record.Kind) ([]record.ID, error) {
+	rows, err := s.db.Query(
+		`SELECT record_id FROM bodies WHERE kind = ? ORDER BY created_at ASC, record_id ASC`,
+		string(kind))
+	if err != nil {
+		return nil, fmt.Errorf("list %s bodies: %w", kind, err)
+	}
+	defer rows.Close()
+
+	var out []record.ID
+	for rows.Next() {
+		var idHex string
+		if err := rows.Scan(&idHex); err != nil {
+			return nil, fmt.Errorf("scan %s body: %w", kind, err)
+		}
+		id, err := record.ParseID(idHex)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, id)
+	}
+	return out, rows.Err()
+}
+
 // CountBodies reports how many records the device holds.
 func (s *Store) CountBodies() (int, error) {
 	var n int

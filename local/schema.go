@@ -15,7 +15,7 @@ var schema = []string{
 	// beside the catalog, for two reasons. One is write amplification, the same
 	// reason the catalog is shaped that way. The other is that a row keyed to
 	// bodies with a cascade meant that dropping this device's copy of a record —
-	// which is how the lower read tiers are reached at all — silently deleted
+	// which is how the lower read tiers are reached at all, silently deleted
 	// its vector and made the record unsearchable.
 	`DROP TABLE IF EXISTS vectors`,
 	// The metadata ranking needs, held apart from the bodies it describes.
@@ -58,7 +58,7 @@ var schema = []string{
 	// It holds the same plaintext the bodies table already holds, so it widens
 	// nothing: this file is the one place plaintext lives, and whatever protects
 	// the working copy protects this. What it adds is a second way to reach a
-	// record — by the words it uses rather than by what it means — which is the
+	// record, by the words it uses rather than by what it means, which is the
 	// half a vector pass cannot do.
 	//
 	// record_id is UNINDEXED because it is carried, not searched: matching

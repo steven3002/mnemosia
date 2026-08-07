@@ -11,7 +11,7 @@ import (
 // It is the complement of recall and not a variant of it. Recall answers "what
 // do I know about this", ranks by similarity, and must never come back empty
 // because a guess was wrong. Browse answers "what is in here", orders by time,
-// and its filters exclude — because a caller listing the records carrying a tag
+// and its filters exclude, because a caller listing the records carrying a tag
 // is naming what it wants rather than inferring it from the wording of a
 // question. Conflating the two would either make browsing unable to select or
 // make recall able to lose an answer.
@@ -37,7 +37,7 @@ type BrowseRow struct {
 	Created record.Time
 	// Label is what to call the record: a memory's statement, a session's title.
 	// It is empty when this device no longer holds the record's body, which is an
-	// ordinary state rather than an error — the record is still on the network
+	// ordinary state rather than an error, the record is still on the network
 	// and still addressable.
 	Label string
 	// Superseded reports that a later record replaced this one.

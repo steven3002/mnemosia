@@ -217,6 +217,9 @@ func (v *Vault) Remember(ctx context.Context, req RememberRequest) (RememberResu
 
 // Flush writes everything queued to the network.
 func (v *Vault) Flush(ctx context.Context) (*store.Flush, error) {
+	if err := v.awaitFirstWrite(ctx); err != nil {
+		return nil, err
+	}
 	result, err := v.packer.Flush(ctx)
 	if err != nil {
 		return nil, err

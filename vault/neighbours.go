@@ -10,7 +10,7 @@ const (
 	// NeighbourLimit is how many existing records a write is compared against.
 	//
 	// Small on purpose. This runs inside the user's wait for a write, and the
-	// question it answers — "is this already here" — is settled by the closest
+	// question it answers, "is this already here", is settled by the closest
 	// few or not at all.
 	NeighbourLimit = 5
 
@@ -21,7 +21,7 @@ const (
 	// measured how well the right record is *found*; nothing has yet measured
 	// where restatement begins, which needs a labelled set of near-duplicates
 	// this project does not have. Every neighbour is returned with its score
-	// whatever side of the line it falls, so the caller can disagree — the
+	// whatever side of the line it falls, so the caller can disagree, the
 	// threshold decides a label, never what is reported.
 	ConflictSimilarity = 0.90
 
@@ -64,8 +64,8 @@ type TagSpecificity struct {
 	// TooCommon marks a tag that sits on so much of the vault that filtering on
 	// it removes little.
 	TooCommon bool
-	// New marks a tag no record carries yet. Not a problem — it is how a
-	// vocabulary grows — but worth surfacing, because it is also what a typo
+	// New marks a tag no record carries yet. Not a problem, it is how a
+	// vocabulary grows, but worth surfacing, because it is also what a typo
 	// looks like.
 	New bool
 }
@@ -75,7 +75,7 @@ type TagSpecificity struct {
 //
 // It exists because of a measured failure rather than as a nicety. Soft metadata
 // filtering is what carries recall, and it works by preferring records that
-// share the query's tags — so in a vault where nearly everything carries the
+// share the query's tags, so in a vault where nearly everything carries the
 // same few tags, it has nothing to prefer. Measured on a single-domain vault of
 // ten thousand records, filtering left 29% of a query's near neighbours still
 // competing, against 11.7% on a mixed vault, and hit@5 fell to 0.797 against

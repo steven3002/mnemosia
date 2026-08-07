@@ -19,7 +19,7 @@ const testPhrase = "abandon abandon abandon abandon abandon abandon " +
 // offlineVault opens a vault with no network and no model.
 //
 // Almost everything here is about what the vault does with a vector rather than
-// about which vector it is — that a record is searchable the moment it is
+// about which vector it is, that a record is searchable the moment it is
 // written, that a supersession hides the record it replaced, that a restatement
 // is recognised, that the index survives a restart. None of that is a property
 // of the embedding model, and loading one for it costs three quarters of a
@@ -76,8 +76,8 @@ func write(t *testing.T, v *vault.Vault, n int, tags []string) vault.RememberRes
 // The interactivity budget, measured where the user actually waits.
 //
 // S2 measured the device write at 398 ms/record and attributed almost all of it
-// to embedding. S3 adds two things to that path — a nearest-neighbour search
-// over vectors already in memory, and a tag-frequency lookup — so the figure to
+// to embedding. S3 adds two things to that path, a nearest-neighbour search
+// over vectors already in memory, and a tag-frequency lookup, so the figure to
 // report is what those cost on top.
 func TestWritePathStaysInteractive(t *testing.T) {
 	// The real model, because the whole claim is a ratio against what embedding
