@@ -461,7 +461,7 @@ func (s *Server) resolveTranscript(ctx context.Context, address Address, opts Re
 // The three misses are matched by their own sentinels rather than by their
 // wording, because they come from three layers that report an absence
 // differently: the session store has no such head, the device has no such body,
-// and the catalog has no such entry. All three mean the same thing to a caller —
+// and the catalog has no such entry. All three mean the same thing to a caller,
 // the address returns nothing, and a caller cannot act on which layer noticed.
 // Anything else is a real failure and is passed through, so a broken indexer
 // never reads as an empty vault.

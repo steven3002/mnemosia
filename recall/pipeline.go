@@ -307,7 +307,7 @@ type dropped struct {
 // rank applies the filter to the fused pool and cuts it to k.
 //
 // The filter is applied here and nowhere else, as an addition to a score. The
-// length of what this returns is min(k, len(fused)) whatever the filter says —
+// length of what this returns is min(k, len(fused)) whatever the filter says,
 // that is the property which makes a wrong filter cost ranking quality instead
 // of the answer, and it is the one thing about this function that must not
 // change.

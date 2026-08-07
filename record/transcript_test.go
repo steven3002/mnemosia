@@ -275,7 +275,7 @@ func mapsParent(stored logRecord) bool {
 	return ok && string(raw) != "null"
 }
 
-// extMessageKey is where the adapter parks the provider's message envelope —
+// extMessageKey is where the adapter parks the provider's message envelope,
 // the fields inside `message` that are not the role or the content.
 const extMessageKey = "message"
 

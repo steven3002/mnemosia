@@ -87,7 +87,7 @@ commit it, and do not put it in a repository-level config that gets shared.
 ## Check 1, does `/resume` render as a slash command?
 
 **Why it matters.** The headline of the product is *open a different agent and carry on*. If the
-prompt renders, that is one keystroke. If it does not, the same conversation is still reachable —
+prompt renders, that is one keystroke. If it does not, the same conversation is still reachable,
 the agent can call `recall` scoped to sessions and then `open`, but it stops being deterministic
 and stops being the user's own decision. The surface is deliberately not built so that anything
 depends on the prompt rendering; this check decides how the demo is framed, not whether it works.
@@ -149,7 +149,7 @@ is why the check measures tag **quality**, not whether anything breaks.
 
 ### The script
 
-Use a **fresh session** so nothing is primed. Do not mention tags, types, or how the vault works —
+Use a **fresh session** so nothing is primed. Do not mention tags, types, or how the vault works,
 the whole point is to see what the agent does with the tool description alone.
 
 **Step 1, ten writes.** Say each of these to the agent, one at a time, as though in passing:

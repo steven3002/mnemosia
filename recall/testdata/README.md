@@ -8,7 +8,7 @@ content, and it cannot be scraped text either.
 ## What it is for
 
 `recall` is the part of this system that can degrade without anything failing.
-A model change, a field-policy change, a change to how the filter is weighted —
+A model change, a field-policy change, a change to how the filter is weighted,
 none of them break a test, and all of them can quietly make the right record
 stop coming back. This corpus exists so that shows up as a number.
 

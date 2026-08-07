@@ -25,7 +25,7 @@ const RRFk = 60.0
 //
 // It is NOT chosen by maximising hit@5. The queries a term index helps and the
 // queries that prove semantic recall are disjoint sets: a query that shares no
-// content word with its answer, the case a memory store exists to handle —
+// content word with its answer, the case a memory store exists to handle,
 // cannot be helped by a lexical signal and is actively harmed by one, because
 // BM25 still ranks *something* and fusion still promotes it. An aggregate hides
 // that, since the queries term matching fixes outnumber the ones it breaks.

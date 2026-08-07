@@ -256,7 +256,7 @@ Call this when a conversation is worth returning to, or whenever the user asks y
 WHAT DECIDES WHETHER IT IS EVER FOUND AGAIN:
 
 - title: one line, specific. "Tide station registry disagreement" is a title; "Chat" is not.
-- summary: what was decided, what was tried, what is still open. THE TRANSCRIPT IS NOT SEARCHABLE —
+- summary: what was decided, what was tried, what is still open. THE TRANSCRIPT IS NOT SEARCHABLE,
   only the title, summary and tags are, because a conversation is mostly filler and tool noise and
   the summary is what a search is actually looking for. Write it for someone deciding whether to open
   the conversation, not as a record of it. Two to five sentences.

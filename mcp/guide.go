@@ -114,7 +114,7 @@ Pass the user's actual question, in their words. The ranking is mostly by meanin
 matching words, so a whole question retrieves better than the nouns pulled out of it.
 
 **Filters prefer; they never exclude.** Supplying tags and types you expect the answer to carry
-improves the ranking, and a tag you guessed wrongly costs a little ranking quality and nothing else —
+improves the ranking, and a tag you guessed wrongly costs a little ranking quality and nothing else,
 records that do not match are still returned, just lower. You cannot lose an answer by guessing, so
 guess.
 
