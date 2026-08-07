@@ -180,7 +180,7 @@ func (s *Server) recall(ctx context.Context, _ *sdk.CallToolRequest, in RecallIn
 		Query: in.Query,
 		// The pipeline ranks a pool and returns its head, so a page is taken by
 		// asking for everything up to the end of it and slicing. The ranking is
-		// deterministic — a stable sort with ties broken on the record id — so
+		// deterministic, a stable sort with ties broken on the record id, so
 		// two pages of one unchanged vault agree. It is an offset into a ranking
 		// and not a keyset, which is the honest shape for a ranked answer: a
 		// record written between two pages does move the boundary, and no
@@ -226,7 +226,7 @@ func (s *Server) recall(ctx context.Context, _ *sdk.CallToolRequest, in RecallIn
 // reorder.
 //
 // A boost can only move a record similarity already retrieved, so a pool the
-// size of the answer would make filtering decorative — the records it exists to
+// size of the answer would make filtering decorative, the records it exists to
 // promote would never have been fetched. This is the depth the measured gain was
 // established at, and a deeper page raises it rather than lowering it.
 func candidatePool(want int) int {
@@ -251,7 +251,7 @@ func recallHint(in RecallIn, out RecallOut) string {
 		return ""
 	case out.ScopeExcluded > 0:
 		return fmt.Sprintf("Nothing in scope %s matched, though %d candidate(s) outside it did. "+
-			"Scope excludes — drop it and search every class of record.",
+			"Scope excludes, drop it and search every class of record.",
 			strings.Join(in.Scope, " and "), out.ScopeExcluded)
 	case out.Searched == 0:
 		return "This vault holds nothing searchable yet. Use `remember` to store the first record."
@@ -262,7 +262,7 @@ func recallHint(in RecallIn, out RecallOut) string {
 		// Not a suggestion to add tags: the filter cannot have emptied this,
 		// and telling a model otherwise would teach it the wrong lesson about a
 		// mechanism the whole ranking rests on.
-		return "The vault does not hold this. Your tags did not cause it — filters only ever prefer, " +
+		return "The vault does not hold this. Your tags did not cause it, filters only ever prefer, " +
 			"and cannot remove a record. Try broader words, or `browse` to see what is stored. " +
 			"Telling the user it is not there is a better answer than the nearest record."
 	}
@@ -281,7 +281,7 @@ func (s *Server) hit(hit recall.Hit, full bool) HitOut {
 		out.Type, out.Tags = string(hit.Memory.Type), hit.Memory.Tags
 		out.Title = firstLine(hit.Memory.Statement)
 		out.Created = hit.Memory.CreatedAt.String()
-		out.Snippet, out.Truncated = snippet(hit.Memory.Statement + " — " + hit.Memory.Context)
+		out.Snippet, out.Truncated = snippet(hit.Memory.Statement + ", " + hit.Memory.Context)
 		if full {
 			out.Detail = memoryDetail(hit.Memory)
 		}
@@ -460,7 +460,7 @@ func writeAdvice(stored vault.RememberResult) string {
 			"again with `supersedes` set if it replaces one.", len(stored.Conflicts)))
 	}
 	if stored.Tags.NeedsNarrowerTags() {
-		advice = append(advice, "None of these tags narrows a search of this vault — each sits on "+
+		advice = append(advice, "None of these tags narrows a search of this vault, each sits on "+
 			"too much of it. Use more specific ones on the next write; this record cannot be retagged.")
 	}
 	return strings.Join(advice, " ")
@@ -537,7 +537,7 @@ func (s *Server) browse(_ context.Context, _ *sdk.CallToolRequest, in BrowseIn) 
 	}
 	if len(out.Rows) == 0 {
 		out.Hint = "Nothing matches. Every filter here EXCLUDES, so this is not evidence the vault " +
-			"holds nothing related — drop a tag, or use `recall` with the same words, where filters " +
+			"holds nothing related, drop a tag, or use `recall` with the same words, where filters " +
 			"only prefer and cannot empty a result."
 	}
 	return &sdk.CallToolResult{Content: withLinks(renderBrowse(out), links)}, out, nil
@@ -604,7 +604,7 @@ func (s *Server) open(ctx context.Context, _ *sdk.CallToolRequest, in OpenIn) (*
 type SaveSessionIn struct {
 	Session       string           `json:"session,omitempty" jsonschema:"the address of a conversation to append to. Omit to create a new one"`
 	Title         string           `json:"title,omitempty" jsonschema:"one specific line naming the conversation. Required when creating"`
-	Summary       string           `json:"summary,omitempty" jsonschema:"what was decided, tried and left open. THE TRANSCRIPT IS NOT SEARCHABLE — this and the title and tags are the whole searchable surface"`
+	Summary       string           `json:"summary,omitempty" jsonschema:"what was decided, tried and left open. THE TRANSCRIPT IS NOT SEARCHABLE, this and the title and tags are the whole searchable surface"`
 	Tags          []string         `json:"tags,omitempty" jsonschema:"two to four specific tags, reused from the vault's vocabulary where they fit"`
 	Messages      []record.Message `json:"messages,omitempty" jsonschema:"the turns to store, in order. On an append, only the new ones"`
 	Project       ProjectIn        `json:"project,omitzero" jsonschema:"where the conversation happened"`
@@ -696,7 +696,7 @@ func sessionDurability(onNetwork bool) string {
 		return "Stored on this device and written to the network."
 	}
 	return "Stored on this device. It reaches the network on the vault's ordinary schedule, within " +
-		"the hour. Until then these turns exist here and nowhere else — say so rather than saying " +
+		"the hour. Until then these turns exist here and nowhere else, say so rather than saying " +
 		"the conversation is backed up."
 }
 
@@ -735,7 +735,7 @@ func (s *Server) forget(_ context.Context, _ *sdk.CallToolRequest, in ForgetIn) 
 			return nil, ForgetOut{}, err
 		}
 		out.Note = "The memory is gone from this vault. Storage comes back later, when nothing " +
-			"written alongside it is still needed — do not report freed space."
+			"written alongside it is still needed, do not report freed space."
 	case FormSession, FormTranscript:
 		if err := s.vault.ForgetSession(address.ID); err != nil {
 			if errors.Is(err, vault.ErrNoSession) {
@@ -815,7 +815,7 @@ func parseScope(values []string) ([]record.Kind, error) {
 // An unknown type here is refused too, but for the opposite reason from a scope:
 // the vocabulary is closed and a type outside it can never match anything, so
 // accepting it would be accepting a filter that silently does nothing. That is a
-// malformed argument, not a wrong guess — a wrong guess is a type in the
+// malformed argument, not a wrong guess, a wrong guess is a type in the
 // vocabulary that the answer does not carry, and that one costs nothing at all.
 func parseTypes(values []string) ([]record.Type, error) {
 	if len(values) == 0 {

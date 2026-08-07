@@ -9,7 +9,7 @@ import (
 // A Filter narrows a recall by preference.
 //
 // It boosts and it cannot do anything else. There is deliberately no predicate
-// on this type — no Matches, no Passes, no Apply that returns a subset — because
+// on this type, no Matches, no Passes, no Apply that returns a subset, because
 // the difference between preferring and excluding is the difference between a
 // slightly worse answer and no answer at all. Applied as an exclusion, a single
 // wrong tag drops hit@5 from 0.949 to 0.729, below not filtering at all, and
@@ -51,7 +51,7 @@ type Weights struct {
 // to be cosine alone, and these constants were an order of magnitude larger to
 // suit it; fusion replaced that scale with one whose whole pool spans about
 // 0.010, where the old tag weight of 0.20 was twenty times the entire spread.
-// A boost that large does not prefer a record, it guarantees it — which is hard
+// A boost that large does not prefer a record, it guarantees it, which is hard
 // filtering under another name, and hard filtering is the thing measured to
 // return nothing at all for a sixth of queries when a single tag is wrong.
 // Carrying the old constants across the scale change would have converted soft
@@ -72,7 +72,7 @@ type Weights struct {
 // answers is the one that ships.
 //
 // Weight is not what limits filtering here. Doubling again reaches 0.932 with a
-// correct filter, and quadrupling reaches 1.000 on the smaller corpus — both by
+// correct filter, and quadrupling reaches 1.000 on the smaller corpus, both by
 // letting a wrong filter do real damage, which is the trade soft filtering
 // exists to refuse.
 //
@@ -90,8 +90,8 @@ func (w Weights) orDefault() Weights {
 
 // Meta is what ranking knows about a record before it has fetched it.
 //
-// Ranking has to decide an order before it reads any bodies — that is the whole
-// point of holding an index — so anything the ordering depends on has to be
+// Ranking has to decide an order before it reads any bodies, that is the whole
+// point of holding an index, so anything the ordering depends on has to be
 // available here rather than on the record itself.
 type Meta struct {
 	// Kind is the record's class. It is what a scope selects on, and it is

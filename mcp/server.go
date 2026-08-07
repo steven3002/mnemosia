@@ -2,7 +2,7 @@
 //
 // It is a skin over vault and holds no logic the command line would also want.
 // Anything a second interface would need belongs one layer down; what lives here
-// is the protocol surface itself — an address space, six tools, the resources
+// is the protocol surface itself, an address space, six tools, the resources
 // they link to, and one prompt.
 package mcp
 
@@ -117,7 +117,7 @@ func build(s *Server) *Server {
 // privateCache marks every result as private to the requesting client.
 //
 // The SDK sets `cacheScope: "public"` on every list and every read, and it does
-// so *after* the handler returns — so a handler cannot override it and this is
+// so *after* the handler returns, so a handler cannot override it and this is
 // the only place that can. Observed on the wire, and it matters here more than
 // in most servers: the listings and reads this server answers are one user's own
 // memories, and "public" invites any intermediary to keep a copy.

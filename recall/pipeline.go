@@ -14,7 +14,7 @@ import (
 //
 // Ranking asks for one vector per recall and nothing else, so this is stated as
 // the one method rather than as the whole embedder: it keeps the pipeline
-// buildable — and testable — without a model resident in the process.
+// buildable, and testable, without a model resident in the process.
 type Embedder interface {
 	EmbedOne(ctx context.Context, text string) ([]float32, error)
 }
@@ -35,7 +35,7 @@ type Fetcher interface {
 // a body has been read the ranking has already happened.
 //
 // It takes the whole candidate pool at once rather than one id at a time. That
-// is not only cheaper — it is what lets the answer be read from the device on
+// is not only cheaper, it is what lets the answer be read from the device on
 // every recall instead of from a cache built when the process started. Another
 // process sharing this vault can supersede a record at any moment, and a cached
 // answer would keep returning the replaced version until something reopened.
@@ -95,7 +95,7 @@ type Request struct {
 	//
 	// This is a hard selector and it is deliberately not the same mechanism as
 	// Filter. The two answer different questions. A filter is a guess about
-	// what the answer will be *about* — an agent infers tags and types from the
+	// what the answer will be *about*, an agent infers tags and types from the
 	// wording of a question, gets some of them wrong, and must never lose an
 	// answer for it; that is why filtering only ever prefers. A scope is a
 	// statement about which container is being addressed, made explicitly by a
@@ -164,7 +164,7 @@ const (
 	// DefaultCandidates is how deep the pool is that the filter reorders.
 	//
 	// A boost can only reorder what similarity already retrieved, so a pool the
-	// size of the answer would make the filter decorative — the records it
+	// size of the answer would make the filter decorative, the records it
 	// exists to promote would never have been fetched. This is the depth the
 	// measured gain was established at.
 	DefaultCandidates = 100

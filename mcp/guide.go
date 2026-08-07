@@ -6,14 +6,14 @@ import "strings"
 //
 // It is the highest-leverage string in the package, and the reason is measured
 // rather than assumed. A production host fetches `resources/list` at connect and
-// keeps it to itself — the model never sees it — so registering a resource does
+// keeps it to itself, the model never sees it, so registering a resource does
 // not make it reachable. Asked for an address it had not been told about, a
 // model correctly refused to guess rather than fabricate a plausible URI. What
 // closed that gap was naming every address here.
 //
 // So: anything a caller must be able to reach appears in this string. A test
 // enforces it against the server's own registrations, because the failure is
-// silent — everything looks registered, and the namespace is simply invisible.
+// silent, everything looks registered, and the namespace is simply invisible.
 var Instructions = strings.TrimSpace(`
 Mnemosia is the user's own encrypted store of memories and past conversations, held on the Sia
 network. The user owns it: the keys are on their device and nothing here is readable by anyone else.
@@ -21,7 +21,7 @@ network. The user owns it: the keys are on their device and nothing here is read
 WHEN TO USE IT
 
 - Call ` + "`recall`" + ` BEFORE answering anything that might depend on what the user has told you
-  before — their preferences, decisions, people, projects, or anything you would otherwise be
+  before, their preferences, decisions, people, projects, or anything you would otherwise be
   guessing at. An empty result is a real answer and means the vault does not hold it.
 - Call ` + "`remember`" + ` when the user states something durable: a fact, a preference, a decision,
   or a correction of something previously believed. Not for passing conversational detail.
@@ -32,7 +32,7 @@ THE TOOLS
 
   recall        search by meaning; returns ranked records with scores and addresses
   remember      store one durable proposition
-  browse        list records by metadata — tags, type, class — newest first
+  browse        list records by metadata, tags, type, class, newest first
   open          read anything in this vault by its address
   save_session  store a conversation, or append turns to one already stored
   forget        remove a record
@@ -79,8 +79,8 @@ device and held on the Sia network. You are reading its guide because you asked 
 
 Two classes of record share one address space and one search:
 
-- **memories** — single durable propositions, retrieved by meaning
-- **sessions** — stored conversations: a small head naming an immutable transcript
+- **memories**, single durable propositions, retrieved by meaning
+- **sessions**, stored conversations: a small head naming an immutable transcript
 
 ` + "`recall`" + ` searches across both. That is deliberate: "have I worked on this before" can be
 answered by a fact, by a past conversation, or by both, and they are not separate systems.
@@ -93,13 +93,13 @@ This is the part that decides whether the vault is useful, and it is worth the a
 dominates it and is useless for the other two.
 
 **Context is not optional and the vault will reject a record without it.** It is what makes a
-statement resolvable once it has been separated from the conversation it came from — where it came
+statement resolvable once it has been separated from the conversation it came from, where it came
 from, what was being decided, what it stands in contrast to. Measured on this project's own corpus,
 adding it moved retrieval more than every model choice available put together.
 
 **Two to four specific tags.** Tags are matched exactly, so:
 
-- prefer the specific to the general — in a vault about one project, tagging everything with that
+- prefer the specific to the general, in a vault about one project, tagging everything with that
   project's name tells nothing apart
 - reuse the vault's existing tags rather than coining a synonym; ` + "`mnemosia://vault`" + ` lists them
 - one tag naming the subject and one naming the aspect beats two words for the same idea
@@ -132,7 +132,7 @@ decided was worth it.
 ## Conversations
 
 ` + "`save_session`" + ` stores a conversation as a title, a summary, tags, and its turns. Only the
-title, summary and tags are searchable — the transcript is never embedded, because a conversation is
+title, summary and tags are searchable, the transcript is never embedded, because a conversation is
 mostly filler and tool noise, and the summary is what a search is actually looking for. Write the
 summary as though someone else will read it to decide whether to open the conversation.
 
@@ -142,7 +142,7 @@ rewritten.
 ## What this vault will not do
 
 It runs no model of its own. It will not summarise, infer importance, or decide that two records are
-the same thing — it reports the evidence and leaves the judgement to you. When a write lands near an
+the same thing, it reports the evidence and leaves the judgement to you. When a write lands near an
 existing record, the response says so and it is yours to decide whether you have added a fact,
 restated one, or contradicted one.
 

@@ -20,7 +20,7 @@ var ErrNoRecord = errors.New("no record at that address")
 //
 // It is the whole of I2. The `open` tool and every `resources/read` handler are
 // two doors into one namespace, and the invariant is that they cannot disagree
-// about what is behind an address — not by convention, but because there is one
+// about what is behind an address, not by convention, but because there is one
 // function that turns an address into bytes and both of them call it. Anything
 // that renders a record renders this value; nothing downstream is allowed a
 // second opinion.
@@ -52,7 +52,7 @@ type Link struct {
 
 // ResolveOptions narrow what a resolution returns.
 //
-// They only ever select a subrange of the same content — a page of a transcript
+// They only ever select a subrange of the same content, a page of a transcript
 // rather than all of it. Nothing here changes how anything is rendered, which is
 // what keeps the two entry points identical when neither asks for anything.
 type ResolveOptions struct {
@@ -443,7 +443,7 @@ func (s *Server) resolveTranscript(ctx context.Context, address Address, opts Re
 	return Resolution{
 		Address:  address,
 		Name:     "transcript " + shortID(loaded.Session.ID),
-		Title:    loaded.Session.Title + " — transcript",
+		Title:    loaded.Session.Title + ", transcript",
 		MIMEType: "application/json",
 		Body:     mustJSON(detail),
 		Detail:   detail,
@@ -462,7 +462,7 @@ func (s *Server) resolveTranscript(ctx context.Context, address Address, opts Re
 // wording, because they come from three layers that report an absence
 // differently: the session store has no such head, the device has no such body,
 // and the catalog has no such entry. All three mean the same thing to a caller —
-// the address returns nothing — and a caller cannot act on which layer noticed.
+// the address returns nothing, and a caller cannot act on which layer noticed.
 // Anything else is a real failure and is passed through, so a broken indexer
 // never reads as an empty vault.
 func notFound(address Address, err error) error {

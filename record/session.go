@@ -185,8 +185,8 @@ func (s *Session) RecordKind() Kind { return KindSession }
 // IndexText is what gets embedded for a session: its title, summary and tags.
 //
 // The transcript is never embedded. Embedding every message of a long
-// conversation is a large cost for a poor result — transcripts are mostly
-// conversational filler and tool noise — and the summary is the surface a
+// conversation is a large cost for a poor result, transcripts are mostly
+// conversational filler and tool noise, and the summary is the surface a
 // search over sessions is actually looking for.
 func (s *Session) IndexText() string {
 	parts := make([]string, 0, 3)

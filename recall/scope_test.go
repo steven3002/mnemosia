@@ -80,7 +80,7 @@ func TestAWrongFilterInsideAScopeStillCostsNothing(t *testing.T) {
 }
 
 // A record whose class this device does not know cannot satisfy an explicit
-// scope, so it is excluded — and counted, because that exclusion is the one the
+// scope, so it is excluded, and counted, because that exclusion is the one the
 // caller might need to see.
 func TestACandidateWithNoMetadataIsOutOfScopeAndCounted(t *testing.T) {
 	candidates, known := mixed(t, 4)
@@ -94,7 +94,7 @@ func TestACandidateWithNoMetadataIsOutOfScopeAndCounted(t *testing.T) {
 		}
 	}
 	if dropped.outOfScope != 3 {
-		t.Fatalf("the scope excluded %d records, want 3 — two sessions and the unknown one", dropped.outOfScope)
+		t.Fatalf("the scope excluded %d records, want 3, two sessions and the unknown one", dropped.outOfScope)
 	}
 
 	// Unscoped, the same record still ranks: not knowing a record's metadata is

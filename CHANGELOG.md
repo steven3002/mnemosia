@@ -20,22 +20,22 @@ it exist; the viewer does not.
   identity beside its ciphertext, so a vault that has lost its catalog can be rebuilt completely.
   Damage is bounded: a truncated or corrupted object yields the records before the break, and the
   authenticated envelope rejects anything that parses but is not what it claims to be.
-- **Three-tier reads** — the device's own copy, a cached storage location, and a cold fetch — with
+- **Three-tier reads**, the device's own copy, a cached storage location, and a cold fetch, with
   every read counted by the tier that served it.
 - **Reclamation.** Storage that nothing points at is released, including storage stranded by an
   installation that no longer exists. Repack rewrites live records into fewer slabs and runs only
   when asked.
 - **Semantic recall with soft metadata filtering.** Tags and a record type supplied with a query
   *prefer* matching records; they never exclude any. A tag guessed wrongly costs a little ranking
-  quality and nothing else, which is deliberate — as an exclusion, one wrong tag was measured
+  quality and nothing else, which is deliberate, as an exclusion, one wrong tag was measured
   returning nothing at all for a sixth of queries.
 - **Hybrid ranking: a full-text index beside the vector one.** Three signals decide the order, in
-  one stated sequence — the vector pass ranks the candidate pool by meaning, a BM25 pass reranks it
+  one stated sequence, the vector pass ranks the candidate pool by meaning, a BM25 pass reranks it
   by the words the query used, and the metadata filter boosts what the caller asked for. The two
   passes are combined by weighted rank fusion, so no score scale has to be reconciled between them,
   and a record either pass found on its own still ranks.
   The lexical weight is small on purpose. It was chosen as the largest value that costs a query
-  sharing *no* word with its answer nothing at all — the case a memory store exists for, and the one
+  sharing *no* word with its answer nothing at all, the case a memory store exists for, and the one
   a term index cannot help and can actively harm. Measured against that criterion, the lexical pass
   buys precision near the top of the list (hit@1 0.627 → 0.678) rather than a better hit@5, and the
   configuration that ships outranks giving the two passes an equal vote on every metric measured.
@@ -45,7 +45,7 @@ it exist; the viewer does not.
 - **Supersession.** A record can replace an earlier one. The replaced version stops being the
   current answer and stays retrievable as history.
 - **Write-time feedback.** Storing a record reports the records nearest to it, flags any close
-  enough to be a restatement, and says how many records already carry each tag used — so a tag too
+  enough to be a restatement, and says how many records already carry each tag used, so a tag too
   common to narrow a search is visible while it is still cheap to change.
 - **The search index persists** as an immutable base plus appended deltas, folded together on a size
   ratio, so restarting does not mean re-deriving every vector.
@@ -55,8 +55,8 @@ it exist; the viewer does not.
 - **A recall regression suite** over a small committed corpus, reporting hit@k and mean reciprocal
   rank on every run, alongside two axes that an aggregate hides: how crowded each query's
   neighbourhood is, and which part of the vault its answers live in.
-- **Sessions: a small head plus ordered, immutable chunks.** A conversation is stored as a head — its
-  title, summary, tags, project, counts and lineage — that names the transcript without containing
+- **Sessions: a small head plus ordered, immutable chunks.** A conversation is stored as a head, its
+  title, summary, tags, project, counts and lineage, that names the transcript without containing
   it. Measured, a four-hundred-turn conversation is a **1,119-byte head over 809 KiB of transcript**,
   and a thousand heads list in a few milliseconds while reading no transcripts at all. Appending
   writes new chunks and rewrites only the head, so the cost of a turn is the size of the turn rather
@@ -78,28 +78,28 @@ it exist; the viewer does not.
   about what an answer will be about and must never cost an answer, while asking for sessions is a
   statement about what is being looked at and is honoured exactly, with the count of what it set
   aside reported alongside.
-- **An MCP server**, `mnemosia-mcp`, over stdio — no listening socket, and both secrets read from the
+- **An MCP server**, `mnemosia-mcp`, over stdio, no listening socket, and both secrets read from the
   environment rather than from a flag or a tool argument. Six tools: `recall`, `remember`, `browse`,
   `open`, `save_session`, `forget`. Every one returns a structured result against a declared schema
   *and* a mirrored text block, and links to records by address rather than by bare id.
 - **One address space, and one function that resolves it.** Memories, conversations and transcripts
   are addresses in a single namespace, and the tool that opens an address and the protocol's own
-  resource reads are the same code path — not by convention but structurally, because there is one
+  resource reads are the same code path, not by convention but structurally, because there is one
   function that turns an address into bytes and both call it. Two entry points into one namespace
   drift quietly, since each looks correct on its own.
 - **Everything reachable is named in the server's instructions**, and a test asserts that against the
   server's own registrations in both directions. A host fetches the resource listing when it connects
   and keeps it to itself, so registering an address does not make it reachable; a model told nothing
   about an address will correctly refuse to guess one.
-- **A `resume` prompt.** It finds a stored conversation — by address, by topic, or just the most
-  recent — and returns its summary, the memories drawn from it, and its recent turns, so a
+- **A `resume` prompt.** It finds a stored conversation, by address, by topic, or just the most
+  recent, and returns its summary, the memories drawn from it, and its recent turns, so a
   conversation can be continued in a different agent from the one it happened in. It says how the
   conversation was chosen and how well it matched, and when it hands over only the recent turns it
   says so rather than letting them pass for the whole conversation.
 - **Results are concise by default**, with snippets, explicit similarity scores, and addresses to
   open for the rest. An empty result is a success with a hint, never an error.
 - **A conversation format that survives a real agent's transcript.** Validated against 159 real
-  Claude Code session logs — 46,311 messages — every one of which converts into this format and back
+  Claude Code session logs, 46,311 messages, every one of which converts into this format and back
   with every field intact. Fixing that revealed a defect worth naming: the format's part vocabulary
   was closed, so a single part type it had not heard of rejected the entire message rather than the
   part. The vocabulary is now open on write.
@@ -123,8 +123,8 @@ it exist; the viewer does not.
 - **Recovering a vault re-derives every vector**, at roughly 0.45 s per record, so a large vault
   takes a while to become searchable again after a recovery. The records themselves come back first.
 - **Only a conversation's summary is searched, never its transcript.** Embedding every message of a
-  long conversation is a large cost for a poor result — transcripts are mostly filler and tool
-  output — so a session is found by its title, summary and tags. The transcript is always there to
+  long conversation is a large cost for a poor result, transcripts are mostly filler and tool
+  output, so a session is found by its title, summary and tags. The transcript is always there to
   be read; it is not what the search reads.
 - **A conversation's transcript is on the network; the head that names it is on the device.** The
   head changes every time the conversation is added to, and storage here holds immutable content, so
@@ -132,7 +132,7 @@ it exist; the viewer does not.
   transcripts and not the records naming them.
 - **A saved conversation is subject to the same flush window as anything else, and this is
   deliberate.** Forcing a write to the network on every append would bill a whole storage slab per
-  turn — measured, forty mebibytes for a transcript of under a kilobyte — so a long conversation
+  turn, measured, forty mebibytes for a transcript of under a kilobyte, so a long conversation
   would consume a large fraction of a free account for a few hundred kilobytes of text. Saving
   reports plainly whether the network has it yet, and a caller who wants it written now can say so.
 
@@ -150,7 +150,7 @@ Design and feasibility work completed against the **live Sia network**. Findings
   helps in both cases and helps most where the competition is thickest, but it does not close the
   gap. Both figures are the same measurement reported honestly; the first alone would not be.
 - **Filtering must prefer rather than exclude.** As an exclusion, a single wrong tag took hit@5 from
-  0.949 to 0.729 — below not filtering at all — and returned nothing whatever for a sixth of
+  0.949 to 0.729, below not filtering at all, and returned nothing whatever for a sixth of
   queries. As a preference, the same wrong filter scores exactly what no filter scores.
 - **Recall is uneven inside a single vault**, and an average conceals it: the queries with the most
   competing records scored 0.690 against 0.933 for the rest of the same vault. Quality is reported

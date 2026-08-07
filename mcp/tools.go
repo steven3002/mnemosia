@@ -24,7 +24,7 @@ import (
 // the measured numbers were written by a model that had read the whole corpus.
 // These descriptions are built on the assumption that a well-briefed agent does
 // nearly as well, and that assumption is scheduled for validation against a real
-// agent — it is not something this package may claim.
+// agent, it is not something this package may claim.
 
 // A Tool is one operation exposed to an agent, with the description that tells
 // the agent how to use it well.
@@ -58,7 +58,7 @@ REQUIRED FIELDS, and why each one matters:
   someone who has never seen this conversation. "The rollup runs hourly" is not a memory; "Tidepool's
   reading rollup runs hourly, at ten past the hour" is.
 
-- context: what makes the statement resolvable on its own — where it came from, what was being
+- context: what makes the statement resolvable on its own, where it came from, what was being
   decided, what it is in contrast to. This is NOT optional and the vault will reject the record
   without it. It is the single largest thing that determines whether this record is ever found
   again, worth more than any other choice in the retrieval pipeline. One or two sentences.
@@ -71,7 +71,7 @@ REQUIRED FIELDS, and why each one matters:
     profile     a durable attribute of a person, team or system
     correction  something that was NEVER TRUE, as opposed to something that has become outdated.
                 Use this when you are recording that a previous belief was wrong. Something that
-                was true and has since changed is not a correction — supersede it instead.
+                was true and has since changed is not a correction, supersede it instead.
 
 - tags: two to four, lowercase, no spaces. This is where recall is won or lost, so it is worth a
   moment's thought:
@@ -79,7 +79,7 @@ REQUIRED FIELDS, and why each one matters:
       that project's name tells nothing apart. "cache-invalidation" separates; "backend" does not.
     * REUSE the vault's existing tags rather than coining a synonym. Two tags meaning one thing
       split the records that should have been found together, and tags are matched exactly.
-    * Add one tag naming the SUBJECT and one naming the ASPECT — what it is about, and what about
+    * Add one tag naming the SUBJECT and one naming the ASPECT, what it is about, and what about
       it. "prediction" plus "accuracy" beats two words for the same idea.
   The response reports how many records already carry each tag you used. A tag already on most of
   the vault will not narrow anything, and that is worth correcting on the next write.
@@ -113,7 +113,7 @@ the response says it is.
 //
 // It states plainly that filters prefer rather than exclude, because an agent
 // that believes a filter is a WHERE clause writes narrow, brittle filters to
-// avoid false positives — which is precisely the behaviour that made hard
+// avoid false positives, which is precisely the behaviour that made hard
 // filtering a cliff. Knowing that a wrong tag is survivable is what makes an
 // agent willing to supply tags at all.
 var RecallTool = Tool{
@@ -124,7 +124,7 @@ Search the user's vault by meaning and return the records most likely to answer 
 
 Pass the user's actual question as the query, in their words. Do not reduce it to keywords: the
 search ranks mostly by meaning and only partly by matching words, so a whole question retrieves
-better than the nouns extracted from it — and the words are still there for the part that wants
+better than the nouns extracted from it, and the words are still there for the part that wants
 them.
 
 ALWAYS supply tags and types when you can infer them from the question. They are the difference
@@ -140,12 +140,12 @@ one subject they matter more, not less.
     "what did we get wrong" by correction
 
 FILTERS PREFER, THEY DO NOT EXCLUDE. A tag you guessed wrongly costs you a little ranking quality
-and nothing else — records that do not match are still returned, just lower. You will never lose an
+and nothing else, records that do not match are still returned, just lower. You will never lose an
 answer by guessing, so guess. Supplying three plausible tags is strictly better than supplying none
 for fear of being wrong.
 
 SCOPE IS THE OPPOSITE AND IT DOES EXCLUDE. Read this even if you skipped the paragraph above.
-"scope" names which class of record may answer at all — memory, session, or both — and anything
+"scope" names which class of record may answer at all, memory, session, or both, and anything
 outside it is removed rather than ranked lower. It is not a filter and the rule about guessing does
 not apply to it: set it ONLY when the user has named a container, as in "list my sessions" or "what
 conversations do I have about this". Never set it because a question's wording suggests a class. Leave
@@ -158,7 +158,7 @@ version are held back, and the response says how many. Ask for history explicitl
 wants to know what something used to be, or how a decision changed.
 
 An empty result is a real answer. It means the vault does not hold this. Say so rather than
-presenting the closest record as if it were responsive — the user knows what they told you, and a
+presenting the closest record as if it were responsive, the user knows what they told you, and a
 confident wrong memory is worse than none.
 
 Results are snippets with addresses, not whole records. Call "open" on an address when you need the
@@ -181,13 +181,13 @@ var BrowseTool = Tool{
 	Description: strings.TrimSpace(`
 List what the vault holds, newest first, by metadata rather than by meaning.
 
-Use this when the user asks what is in there — "what have I saved about the deploy", "show me my
-recent conversations" — and use "recall" when they ask a question the vault might answer. Browsing
+Use this when the user asks what is in there, "what have I saved about the deploy", "show me my
+recent conversations", and use "recall" when they ask a question the vault might answer. Browsing
 orders by time and never ranks; searching ranks and never orders by time.
 
 EVERY FILTER HERE EXCLUDES. This is the opposite of "recall", deliberately, and the difference is
 about who is guessing. When you infer a tag from the wording of a question you are guessing, and a
-wrong guess must never lose an answer — so recall only ever prefers. When the user asks to see the
+wrong guess must never lose an answer, so recall only ever prefers. When the user asks to see the
 records carrying a tag, nobody is guessing, and returning records without it would be the wrong
 answer rather than a slightly worse one. So here:
 
@@ -227,7 +227,7 @@ inventing one that looks plausible is worse than saying you do not have it.
 
 Read mnemosia://vault before your first write in a conversation. It lists the tags this vault already
 uses, and reusing one rather than coining a synonym for it is what keeps related records findable
-together — tags are matched exactly, so "cache-invalidation" and "cache_invalidation" are two
+together, tags are matched exactly, so "cache-invalidation" and "cache_invalidation" are two
 different tags holding half the answer each.
 
 A transcript can be long. Pass a limit to read a page of it, and pass the returned "nextFrom" back as
@@ -248,7 +248,7 @@ var SaveSessionTool = Tool{
 	Name:  "save_session",
 	Title: "Store a conversation",
 	Description: strings.TrimSpace(`
-Store this conversation in the user's vault so it can be found and continued later — including in a
+Store this conversation in the user's vault so it can be found and continued later, including in a
 different agent.
 
 Call this when a conversation is worth returning to, or whenever the user asks you to save it.
@@ -263,7 +263,7 @@ WHAT DECIDES WHETHER IT IS EVER FOUND AGAIN:
 - tags: two to four specific ones, reused from the vault's own vocabulary where they fit.
 
 - messages: the turns. Each needs an id unique within the conversation, a role, and content as an
-  ordered list of typed parts — text, reasoning, toolCall, toolResult, file, resourceLink. A tool call
+  ordered list of typed parts, text, reasoning, toolCall, toolResult, file, resourceLink. A tool call
   and the result it produced MUST carry the same callId; that correlation is the one thing no later
   reader can reconstruct, and a call without it is refused rather than stored broken. Anything your
   runtime knows that this schema does not name goes in "ext" on the message or the part, and comes
@@ -272,13 +272,13 @@ WHAT DECIDES WHETHER IT IS EVER FOUND AGAIN:
 APPENDING. To add turns to a conversation already stored, pass its address as "session" and ONLY the
 new turns. Nothing already stored is rewritten, so the cost of an append is the size of the append.
 The title, summary and tags are updated only if you supply them, so you can add turns without
-restating what you already said — but do refresh the summary when the conversation has moved on, or
+restating what you already said, but do refresh the summary when the conversation has moved on, or
 it will be found by what it used to be about.
 
 DURABILITY. The conversation is on the user's device before this returns and reaches the network on
 the vault's ordinary schedule, within the hour. The response says which has happened. Do not tell the
 user a conversation is stored on the network until the response says it is. Set "durable" to write it
-to the network now — do that at the end of a long session, not on every append, because each forced
+to the network now, do that at the end of a long session, not on every append, because each forced
 write costs a whole storage block whatever it holds.
 `),
 }
@@ -296,7 +296,7 @@ history, and superseding it removes it from ordinary recall while leaving the tr
 for things the user does not want stored at all.
 
 Requires "confirm": true. Ask the user first unless they have just asked you to delete this
-particular thing — you are removing something from a store they own, and it is the one operation here
+particular thing, you are removing something from a store they own, and it is the one operation here
 that cannot be undone from inside the vault.
 
 Forgetting a conversation removes its transcript too. Forgetting a memory drawn from a conversation

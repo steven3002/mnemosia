@@ -197,8 +197,8 @@ func (s *Store) Hydrate() ([]Entry, error) {
 // Remove withdraws a record from the persisted index.
 //
 // Removal markers are not carried into the base. Unlike the catalog, nothing
-// ever replays an older file over a newer base here — the base is written from
-// what hydration produced, which has already dropped the removed records — so
+// ever replays an older file over a newer base here, the base is written from
+// what hydration produced, which has already dropped the removed records, so
 // there is no path by which a forgotten vector could come back.
 func (s *Store) Remove(ids ...record.ID) error {
 	entries := make([]Entry, len(ids))

@@ -7,8 +7,8 @@ import "context"
 // It exists so that the layers above can be built and exercised without a
 // model resident in the process. The model is a third of a gigabyte once
 // loaded, which is affordable once and not affordable in every test binary at
-// the same time; and most of what the vault does with a vector — storing it,
-// persisting it, ranking on it, superseding a record that has one — is
+// the same time; and most of what the vault does with a vector, storing it,
+// persisting it, ranking on it, superseding a record that has one, is
 // indifferent to which model produced it.
 //
 // Model is part of the interface rather than something the caller configures

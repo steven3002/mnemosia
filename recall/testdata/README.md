@@ -16,15 +16,15 @@ stop coming back. This corpus exists so that shows up as a number.
 
 The corpus is deliberately **imbalanced**: 70 of its 82 records belong to one
 subject and the remaining 12 are a long tail. That is the vault shape a
-real user has, and it is the one that was never measured until it was — a
+real user has, and it is the one that was never measured until it was, a
 single-domain vault and a mixed vault turn out to behave differently even at
 matched neighbour density, so the harness reports **both** axes:
 
-- **near-neighbour density per query** — how many records compete with a typical
+- **near-neighbour density per query**, how many records compete with a typical
   correct answer to that query. Recall falls steeply with it, and an aggregate
   score hides that completely: in the measured case one vault held two
   populations twenty-four points apart.
-- **vault shape** — `dominant` or `long-tail`, because density alone does not
+- **vault shape**, `dominant` or `long-tail`, because density alone does not
   account for the difference between them. A same-subject neighbour carries the
   same tags as the answer, so the filter cannot separate them; a neighbour from
   another subject at the same similarity is removed.
@@ -36,13 +36,13 @@ matched neighbour density, so the harness reports **both** axes:
 | `id` | stable handle, used by the queries' gold sets |
 | `type` | one of the six-type vocabulary |
 | `statement` | one atomic proposition |
-| `context` | what makes the statement resolvable on its own — mandatory |
+| `context` | what makes the statement resolvable on its own, mandatory |
 | `tags` | what a writer would plausibly have tagged it |
 | `shape` | `dominant` or `long-tail`, the sub-vault it belongs to |
 | `supersedes` | the record this one replaces, where one does |
 
 Queries carry a `gold` set and the `filter` a competent agent would emit **from
-the query text alone** — never from the gold set, which would make the filter
+the query text alone**, never from the gold set, which would make the filter
 arm measure nothing.
 
 ## Granularity
@@ -65,5 +65,5 @@ integration fetches the model as a setup step and points `MNEMOSIA_MODELS` at it
 
 The corpus is embedded **once for the whole package**. Producing 82 vectors costs
 about thirty seconds on the pure-Go backend, and rebuilding per test pushed the
-package past Go's default ten-minute timeout — which would have made the harness
+package past Go's default ten-minute timeout, which would have made the harness
 fail in exactly the place it exists to run.

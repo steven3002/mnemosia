@@ -43,7 +43,7 @@ type Chunk struct {
 // to fetch it, and nothing that requires fetching it.
 //
 // It names the chunk by record id and not by object ref. Object refs are a
-// mutable pointer — a repack rewrites every one of them — so a transcript keyed
+// mutable pointer, a repack rewrites every one of them, so a transcript keyed
 // on storage location would break the first time storage was reorganised.
 type ChunkRef struct {
 	ID  ID  `json:"id"`

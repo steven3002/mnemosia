@@ -10,8 +10,8 @@ import (
 	"github.com/steven3002/mnemosia/record"
 )
 
-// corpusPath is the committed regression fixture. It is wholly invented — see
-// testdata/README.md — because it is public and must hold no vault content.
+// corpusPath is the committed regression fixture. It is wholly invented, see
+// testdata/README.md, because it is public and must hold no vault content.
 const corpusPath = "testdata/corpus.json"
 
 // The two sub-vaults the corpus is built from. Real vaults are imbalanced, and

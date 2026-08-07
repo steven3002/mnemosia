@@ -9,7 +9,7 @@ import (
 //
 // It returns ids in rank order, best first, and nothing else. Fusion consumes
 // ranks rather than scores, so a BM25 score never leaves the index that computed
-// it — which is what lets the lexical pass be replaced without renegotiating a
+// it, which is what lets the lexical pass be replaced without renegotiating a
 // score scale with the ranker.
 type Lexical interface {
 	SearchLexical(query string, k int) ([]record.ID, error)
@@ -25,7 +25,7 @@ const RRFk = 60.0
 //
 // It is NOT chosen by maximising hit@5. The queries a term index helps and the
 // queries that prove semantic recall are disjoint sets: a query that shares no
-// content word with its answer — the case a memory store exists to handle —
+// content word with its answer, the case a memory store exists to handle —
 // cannot be helped by a lexical signal and is actively harmed by one, because
 // BM25 still ranks *something* and fusion still promotes it. An aggregate hides
 // that, since the queries term matching fixes outnumber the ones it breaks.
@@ -35,7 +35,7 @@ const RRFk = 60.0
 // four of which share no indexed term with their answer: those four hold their
 // ranking unchanged up to 0.035 and lose an answer out of the top five at 0.040.
 // Everything at or below 0.035 leaves hit@5 exactly where the vector pass alone
-// puts it and buys precision higher up — at this weight, hit@1 rises 0.627 to
+// puts it and buys precision higher up, at this weight, hit@1 rises 0.627 to
 // 0.678 and MRR 0.717 to 0.745.
 //
 // The shipped value is one probe step inside that boundary rather than on it.
@@ -44,8 +44,8 @@ const RRFk = 60.0
 // and the risk is not symmetric, since the cost of being over the line is the
 // query class this product exists for.
 //
-// Full parity with the vector pass — weight 1.0, the unweighted fusion the
-// lexical pass is usually specified with — reaches 0.881 hit@5 against 0.847,
+// Full parity with the vector pass, weight 1.0, the unweighted fusion the
+// lexical pass is usually specified with, reaches 0.881 hit@5 against 0.847,
 // and takes all four zero-overlap queries out of the top five to do it.
 const DefaultLexicalWeight = 0.03
 
@@ -53,7 +53,7 @@ const DefaultLexicalWeight = 0.03
 //
 // Reciprocal rank fusion, weighted. A record's score is the sum over the passes
 // that retrieved it of weight/(RRFk + rank), which needs no normalisation
-// between cosine and BM25 because it never compares their scores — only the
+// between cosine and BM25 because it never compares their scores, only the
 // positions each assigned.
 //
 // Membership is the union of the two passes, not the vector pass alone. That is

@@ -26,7 +26,7 @@ func saveConversation(t *testing.T, session *sdk.ClientSession, in mcp.SaveSessi
 //
 // It is the same property the record package asserts, re-asserted at the
 // boundary an agent actually reaches, because the two places a portable
-// transcript can be flattened are the schema and the wire — and the schema had
+// transcript can be flattened are the schema and the wire, and the schema had
 // already been proved.
 func TestAConversationSurvivesTheProtocolWithItsToolCallsCorrelated(t *testing.T) {
 	session, _ := serve(t)
@@ -222,7 +222,7 @@ func TestScopeExcludesWhereAFilterOnlyPrefers(t *testing.T) {
 //
 // It finds the conversation, frames what is being handed over, embeds the head
 // and the memories drawn from it, and replays the turns. What it cannot prove
-// from here is that a host renders it as a slash command — that is M12, and it
+// from here is that a host renders it as a slash command, that is M12, and it
 // needs a person at an interactive session.
 func TestTheResumePromptReturnsTheConversationAndWhatWasLearnedInIt(t *testing.T) {
 	session, _ := serve(t)
@@ -251,7 +251,7 @@ func TestTheResumePromptReturnsTheConversationAndWhatWasLearnedInIt(t *testing.T
 		t.Fatalf("the server offers prompts %+v, want just %q", listed.Prompts, mcp.ResumePrompt)
 	}
 
-	// No arguments at all: the most recent conversation. This is the demo — one
+	// No arguments at all: the most recent conversation. This is the demo, one
 	// keystroke in a different agent.
 	got, err := session.GetPrompt(ctx, &sdk.GetPromptParams{Name: mcp.ResumePrompt})
 	if err != nil {
@@ -348,7 +348,7 @@ func TestResumingByTopicFindsTheConversationAndNeverAMemory(t *testing.T) {
 	}
 
 	// A topic that matches nothing well still resumes the nearest conversation,
-	// because a ranked search always returns its best candidate — and it says
+	// because a ranked search always returns its best candidate, and it says
 	// how well it matched rather than testing that against an invented cutoff.
 	// One unanswerable query was ever measured, and one observation is not
 	// enough to ship a threshold on; a wrong one would refuse to resume a

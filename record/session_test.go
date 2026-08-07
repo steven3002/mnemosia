@@ -10,7 +10,7 @@ import (
 
 // The whole point of the message schema is that it survives being written down
 // and read back. A vendor field this build has never heard of has to come back
-// byte for byte, because the alternative — dropping what cannot be named — is
+// byte for byte, because the alternative, dropping what cannot be named, is
 // the documented lossiness of every cross-agent converter that exists.
 func TestAMessageRoundTripsIncludingFieldsThisBuildDoesNotUnderstand(t *testing.T) {
 	original := record.Message{
@@ -155,7 +155,7 @@ func TestAToolPartWithoutACorrelationIdIsRefused(t *testing.T) {
 //
 // Found by running the schema against a real agent's stored transcripts: a tool
 // result may contain a part type this build has never met, and a closed
-// vocabulary costs the whole message rather than the one part — which is the
+// vocabulary costs the whole message rather than the one part, which is the
 // opposite of what a portable record is for. The correlation id stays mandatory,
 // because that one is unrecoverable; a type nobody recognises is not.
 func TestAPartTypeThisBuildDoesNotKnowIsStoredRatherThanRefused(t *testing.T) {

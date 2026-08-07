@@ -116,7 +116,7 @@ func TestAMemoryWrittenInOneSessionIsRecalledInALaterOne(t *testing.T) {
 }
 
 // Pass mark 3. `open` and `resources/read` return identical content for the
-// same address — the shared-resolver test.
+// same address, the shared-resolver test.
 //
 // It is asserted over every addressable form rather than over one, because the
 // failure this exists to prevent was exactly a form that one door knew about and
@@ -336,7 +336,7 @@ func TestAnEmptyResultIsASuccessWithAHint(t *testing.T) {
 // this server does not implement.
 //
 // The SDK advertises logging by default, and a capability advertised without a
-// handler is a claim a client will act on and then find false — measured once
+// handler is a claim a client will act on and then find false, measured once
 // already, when a subscribe capability set by hand answered method-not-found.
 func TestNoCapabilityIsAdvertisedWithoutAHandler(t *testing.T) {
 	session, _ := serve(t)
@@ -370,7 +370,7 @@ func TestNoCapabilityIsAdvertisedWithoutAHandler(t *testing.T) {
 // asked for them.
 //
 // The SDK stamps `cacheScope: "public"` on every list and read, and it does so
-// after the handler returns — so a handler cannot override it, and middleware is
+// after the handler returns, so a handler cannot override it, and middleware is
 // the only place that can. For a store whose whole claim is that nobody else can
 // read it, shipping "public" on a listing of one user's memories is wrong.
 func TestUserContentIsNotAdvertisedAsPubliclyCacheable(t *testing.T) {
@@ -426,7 +426,7 @@ func TestAnAddressThatResolvesToNothingSaysSoThroughBothDoors(t *testing.T) {
 //
 // An unconfigured server that refuses the connection tells the user nothing: the
 // host reports a failed launch and they are left guessing. This is the shape the
-// specification asks for — not onboarded is a tool execution error, not a
+// specification asks for, not onboarded is a tool execution error, not a
 // protocol one.
 func TestAServerWithNoVaultExplainsItselfRatherThanRefusingToStart(t *testing.T) {
 	session := connect(t, mcp.Unopened(context.Canceled))

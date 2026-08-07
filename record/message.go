@@ -156,8 +156,8 @@ type Usage struct {
 // dispatching on the discriminator has to fail or drop it.
 //
 // The correlation id is on both the call and the result and is named the same
-// on each. Vendors spell it four different ways — tool_use_id, call_id,
-// toolCallId, gen_ai.tool.call.id — so no spelling is portable and the concept
+// on each. Vendors spell it four different ways, tool_use_id, call_id,
+// toolCallId, gen_ai.tool.call.id, so no spelling is portable and the concept
 // is: an explicit id linking a call to its result is the only genuinely
 // universal part of tool semantics, and it is what a projection into any of
 // those formats is built from.
@@ -237,7 +237,7 @@ func (p *Part) validate(messageID string) error {
 	//
 	// Measured against a real agent's stored log: a tool result may contain a
 	// part type this build has never heard of, and a closed vocabulary refuses
-	// the whole message rather than the part — which is the opposite of what a
+	// the whole message rather than the part, which is the opposite of what a
 	// portable record is for. Nothing above this is asked to understand an
 	// unrecognised part; it is stored with its fields intact and rendered as
 	// opaque. A type is required because a part with none cannot be interpreted

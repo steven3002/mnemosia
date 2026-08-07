@@ -13,7 +13,7 @@ import (
 const Scheme = "mnemosia://"
 
 // The vault's whole namespace. Everything a caller can reach has an address
-// here, and every address is named in Instructions — a resource a host fetches
+// here, and every address is named in Instructions, a resource a host fetches
 // and keeps to itself is invisible to the model, so registering one is not the
 // same as making it reachable.
 const (
@@ -27,7 +27,7 @@ const (
 	// records cannot be listed into a model's context, and recall and browse
 	// exist to reach them.
 	MemoryTemplate = Scheme + "memory/{id}"
-	// SessionTemplate addresses one conversation's head — its title, summary,
+	// SessionTemplate addresses one conversation's head, its title, summary,
 	// counts and links, without its transcript.
 	SessionTemplate = Scheme + "session/{id}"
 	// TranscriptTemplate addresses a conversation's messages.
@@ -92,7 +92,7 @@ func TranscriptURI(id record.ID) string { return URI(record.KindSession, id) + "
 // Parse reads a vault URI.
 //
 // There is exactly one of these, and every path into the namespace goes through
-// it — the tool that opens a record and the protocol's own resource reads alike.
+// it, the tool that opens a record and the protocol's own resource reads alike.
 // Two entry points into one address space drift, and they drift quietly, because
 // each looks correct on its own. Measured once already: an `open` tool answered
 // "no record at mnemosia://guide" for a resource sitting in the server's own

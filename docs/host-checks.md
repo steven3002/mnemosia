@@ -42,7 +42,7 @@ printf '%s\n' \
 
 A working server prints one line naming the negotiated protocol version and one listing six tools,
 and writes `mnemosia-mcp: serving a vault on …` to stderr. If it reports having no vault, it will
-still start and every tool will tell you what is missing — that is deliberate, so a misconfigured
+still start and every tool will tell you what is missing, that is deliberate, so a misconfigured
 server explains itself instead of failing to launch.
 
 ### Adding it to a host
@@ -50,7 +50,7 @@ server explains itself instead of failing to launch.
 Every host below launches a **stdio** server: a command, no arguments, and two environment
 variables. The mechanism differs per host and each one's own documentation is authoritative.
 
-**Claude Code** — verified on this machine against **2.1.223**:
+**Claude Code**, verified on this machine against **2.1.223**:
 
 ```bash
 claude mcp add mnemosia \
@@ -62,7 +62,7 @@ claude mcp list          # should show mnemosia as connected
 claude mcp get mnemosia  # health-checks it
 ```
 
-**Claude Desktop, Cursor, VS Code** — each takes a JSON entry of the same shape. Use the host's own
+**Claude Desktop, Cursor, VS Code**, each takes a JSON entry of the same shape. Use the host's own
 current documentation for the file's location and exact key names; the entry itself is:
 
 ```json
@@ -84,11 +84,11 @@ commit it, and do not put it in a repository-level config that gets shared.
 
 ---
 
-## Check 1 — does `/resume` render as a slash command?
+## Check 1, does `/resume` render as a slash command?
 
 **Why it matters.** The headline of the product is *open a different agent and carry on*. If the
 prompt renders, that is one keystroke. If it does not, the same conversation is still reachable —
-the agent can call `recall` scoped to sessions and then `open` — but it stops being deterministic
+the agent can call `recall` scoped to sessions and then `open`, but it stops being deterministic
 and stops being the user's own decision. The surface is deliberately not built so that anything
 depends on the prompt rendering; this check decides how the demo is framed, not whether it works.
 
@@ -100,7 +100,7 @@ Then:
 
 ### In each host, in a **new** session
 
-1. Type `/` and look for **`resume`** in the command list. It may be namespaced — hosts commonly
+1. Type `/` and look for **`resume`** in the command list. It may be namespaced, hosts commonly
    prefix MCP prompts with the server name, so look for `resume`, `mnemosia:resume`, or
    `/mcp__mnemosia__resume`.
 2. Run it **with no arguments**. It should resume the most recent conversation.
@@ -112,10 +112,10 @@ Then:
 - Running it fills the input with, or sends, a block that begins
   *"Resume this conversation from the user's own Mnemosia vault"* and names how the conversation was
   chosen.
-- The assistant answers as though it had been in that conversation — it can say what the
+- The assistant answers as though it had been in that conversation, it can say what the
   conversation was about without calling a tool first.
 
-**A partial pass** — worth recording separately: the prompt exists but only through a menu, or only
+**A partial pass**, worth recording separately: the prompt exists but only through a menu, or only
 by typing its full name, or the arguments cannot be supplied.
 
 **A fail:** no prompt appears anywhere, even though `mcp list`/the host's own inspector shows the
@@ -132,7 +132,7 @@ server connected. Record what the host *does* show.
 
 ---
 
-## Check 2 — does a real agent supply usable tags?
+## Check 2, does a real agent supply usable tags?
 
 **Why it matters, and this is the more important of the two.** Mnemosia's retrieval quality rests on
 the agent emitting two or three accurate tags at both ends: on the write, so the record is
@@ -152,28 +152,28 @@ is why the check measures tag **quality**, not whether anything breaks.
 Use a **fresh session** so nothing is primed. Do not mention tags, types, or how the vault works —
 the whole point is to see what the agent does with the tool description alone.
 
-**Step 1 — ten writes.** Say each of these to the agent, one at a time, as though in passing:
+**Step 1, ten writes.** Say each of these to the agent, one at a time, as though in passing:
 
 1. "Remember that our reading rollup runs hourly, at ten past the hour."
 2. "Remember I prefer review comments phrased as questions, not instructions."
 3. "Remember that the dashboard reads from the rollup table and never from the raw feed."
 4. "Remember the north pier gauge is the one we trust when two gauges disagree."
 5. "Remember that Ana owns the ingest pipeline and Dele owns the dashboard."
-6. "Remember we decided against caching the tide predictions — it was never the bottleneck."
+6. "Remember we decided against caching the tide predictions, it was never the bottleneck."
 7. "Remember the staging indexer is rebuilt every Sunday night."
-8. "Actually, I was wrong earlier — the rollup runs at ten past, not on the hour. Remember that
+8. "Actually, I was wrong earlier, the rollup runs at ten past, not on the hour. Remember that
    correction."
 9. "Remember that deploys are blocked while a rollup is in flight."
 10. "Remember the harbour survey found silting at the eastern approach."
 
 **Record for each write**, from the tool call the host shows you:
 
-- the `type` it chose — is it defensible?
-- the `tags` it chose — how many, and how specific?
+- the `type` it chose, is it defensible?
+- the `tags` it chose, how many, and how specific?
 - whether it wrote a real `context` or restated the statement
 - whether it used `supersedes` on #8, or wrote a `correction`, or neither
 
-**Step 2 — ten questions.** In a **second fresh session**, ask:
+**Step 2, ten questions.** In a **second fresh session**, ask:
 
 1. "When does the rollup run?"
 2. "How does Ana like review comments?" *(deliberately attributes a preference to the wrong person)*
@@ -191,7 +191,7 @@ the whole point is to see what the agent does with the tool description alone.
 - did the agent call `recall` **before** answering, or answer from the conversation?
 - did it supply `tags`? how many, and did any match the stored record's tags?
 - did it supply `types`? was the type right for the question shape?
-- did it set `scope`? **It should not have** — none of these names a container. A `scope` set on any
+- did it set `scope`? **It should not have**, none of these names a container. A `scope` set on any
   of these is a finding, and an important one: `scope` excludes, and one set on a guess is the
   failure the soft filter exists to avoid.
 - was the right record in the top five?
@@ -202,7 +202,7 @@ the whole point is to see what the agent does with the tool description alone.
 |---|---|---|
 | Tags per write | 2–4 | 0–1, or 5+ |
 | Tag specificity | subject + aspect, e.g. `rollup` + `schedule` | one broad tag on everything, e.g. `tidepool` |
-| Tag reuse across writes | the same concept gets the same tag | synonyms — `rollup` and `rollups` and `roll-up` |
+| Tag reuse across writes | the same concept gets the same tag | synonyms, `rollup` and `rollups` and `roll-up` |
 | Context field | adds what the statement does not say | restates the statement |
 | Tags per query | 1–3, at least one matching | none supplied at all |
 | `scope` on a subject question | never set | set on any of the ten |
@@ -212,7 +212,7 @@ the whole point is to see what the agent does with the tool description alone.
 five.** Everything else explains that number.
 
 ⚠️ **If the agent supplies no tags at all on queries, that is the finding**, and it is a bigger
-result than a low hit rate — it means the descriptions are not reaching the agent, and the
+result than a low hit rate, it means the descriptions are not reaching the agent, and the
 descriptions are the only lever there is. Note whether the host uses progressive tool discovery: if
 it shows names first and fetches schemas on demand, the agent may be deciding to call `recall`
 before it has ever read the description, which would point at the one-line summary rather than the

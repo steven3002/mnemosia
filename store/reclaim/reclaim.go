@@ -102,13 +102,13 @@ func (s Sweep) Freed() uint64 {
 // billed whole: the space comes back only when a slab has no live object left
 // and the slab itself is released. So this runs in two passes, and their order
 // is not interchangeable. Releasing a slab while an object still points into it
-// does not merely orphan the object — the object's identity is derived from the
+// does not merely orphan the object, the object's identity is derived from the
 // slab's sectors, so it becomes something no key opens, and it goes on billing
 // and on being listed. Objects first, then slabs.
 //
 // The ledger, not the account listing, is what bounds this. An account can hold
-// objects this vault did not write — another vault under the same key, or an
-// older tool — and a sweep that reasoned from "everything the catalog does not
+// objects this vault did not write, another vault under the same key, or an
+// older tool, and a sweep that reasoned from "everything the catalog does not
 // name" would delete them. Only slabs this vault pinned are its to release.
 func (r *Reclaimer) Sweep(ctx context.Context, live Live) (Sweep, error) {
 	start := time.Now()
@@ -180,8 +180,8 @@ type Orphan struct {
 //
 // The indexer's slab list is the authority here, not the ledger. A slab whose
 // objects have all been deleted goes on billing forever, and if the device that
-// pinned it is gone — reinstalled, replaced, or simply run from a different
-// directory — nothing local remembers it exists. Asking the indexer what it is
+// pinned it is gone, reinstalled, replaced, or simply run from a different
+// directory, nothing local remembers it exists. Asking the indexer what it is
 // charging for is the only way to find that storage.
 func (r *Reclaimer) Orphans(ctx context.Context) ([]Orphan, error) {
 	pinned, err := r.client.PinnedSlabs(ctx)
@@ -251,7 +251,7 @@ func (r *Reclaimer) ReleaseOrphans(ctx context.Context) (Sweep, error) {
 // DropUnreadable deletes objects the indexer will not open.
 //
 // They hold nothing recoverable and keep their slab alive, so they are pure
-// cost — but they carry no slab this vault can check them against, which is
+// cost, but they carry no slab this vault can check them against, which is
 // why removing them is asked for rather than assumed. The state is reached by
 // releasing a slab while objects still pointed into it.
 func (r *Reclaimer) DropUnreadable(ctx context.Context) ([]sia.ObjectRef, error) {

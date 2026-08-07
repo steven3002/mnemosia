@@ -9,7 +9,7 @@ import "encoding/json"
 // rather than merely necessary.
 //
 // The first is that it cannot be inferred. A stored message's content is an
-// ordered list of typed parts, and a tool result carries parts of its own — so a
+// ordered list of typed parts, and a tool result carries parts of its own, so a
 // tool that returned an image is stored as an image rather than as a description
 // of one. That recursion is the point of the shape, and schema inference rejects
 // a recursive Go type outright rather than emitting the `$ref` that expresses it.
@@ -18,7 +18,7 @@ import "encoding/json"
 // descriptions come from struct tags, and the record package's types carry none:
 // they describe how a message is stored, not how an agent should fill one in.
 // Every property below is documented for the agent that has to construct one,
-// and the correlation id — the single field no later reader can reconstruct — is
+// and the correlation id, the single field no later reader can reconstruct, is
 // stated twice, once on each half of the exchange.
 //
 // A test asserts that every field of record.Message and record.Part appears

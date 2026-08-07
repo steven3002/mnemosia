@@ -25,8 +25,8 @@ type Policy struct {
 	MaxAge time.Duration
 	// MaxBytes flushes when the queue would no longer fit one slab.
 	//
-	// At realistic record sizes this fires on the order of years — a hundred
-	// records a day fills a slab in over a year — so it is a bulk-import valve
+	// At realistic record sizes this fires on the order of years, a hundred
+	// records a day fills a slab in over a year, so it is a bulk-import valve
 	// rather than a trigger anyone will meet.
 	MaxBytes int64
 	// MaxRecords bounds the queue so a burst cannot grow it without limit.

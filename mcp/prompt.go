@@ -37,14 +37,14 @@ const ResumeTurns = 30
 // ⚠ Whether a host actually renders it as a slash command is confirmed for none
 // of them from this side of the wire. It needs a person at an interactive
 // session; the surface is built so that it does not depend on one host's
-// rendering — the same conversation is reachable through `recall` and `open`
+// rendering, the same conversation is reachable through `recall` and `open`
 // with no prompt at all.
 func (s *Server) registerPrompts() {
 	s.sdk.AddPrompt(&sdk.Prompt{
 		Name:  ResumePrompt,
 		Title: "Resume a stored conversation",
-		Description: "Bring back a conversation stored in Mnemosia — its summary, its most recent " +
-			"turns, and the memories drawn from it — so you can carry on where you left off, " +
+		Description: "Bring back a conversation stored in Mnemosia, its summary, its most recent " +
+			"turns, and the memories drawn from it, so you can carry on where you left off, " +
 			"including in a different agent from the one it happened in.",
 		Arguments: []*sdk.PromptArgument{
 			{
@@ -96,7 +96,7 @@ func (s *Server) resume(ctx context.Context, req *sdk.GetPromptRequest) (*sdk.Ge
 	}
 
 	result := &sdk.GetPromptResult{
-		Description: fmt.Sprintf("Resuming %q — %d of %d turn(s), %s",
+		Description: fmt.Sprintf("Resuming %q, %d of %d turn(s), %s",
 			loaded.Session.Title, len(replayed), loaded.Session.Counts.Messages, how),
 	}
 	result.Messages = append(result.Messages, &sdk.PromptMessage{
@@ -106,7 +106,7 @@ func (s *Server) resume(ctx context.Context, req *sdk.GetPromptRequest) (*sdk.Ge
 
 	// The head, embedded rather than summarised. A host that renders embedded
 	// resources shows the user what is being brought back, and a model reading
-	// it gets the same bytes `open` would return for the same address — because
+	// it gets the same bytes `open` would return for the same address, because
 	// it is the same resolver.
 	head, err := s.Resolve(ctx, URI(record.KindSession, session), ResolveOptions{})
 	if err != nil {
@@ -290,7 +290,7 @@ func (s *Server) findSession(ctx context.Context, address, topic string) (record
 		// The similarity is reported rather than tested against a threshold.
 		//
 		// A ranked search always returns its nearest candidate, so a topic that
-		// matches nothing well still resolves to something — and the honest
+		// matches nothing well still resolves to something, and the honest
 		// response is to say how well it matched, not to invent a cutoff.
 		// This project measured exactly one unanswerable query and recorded that
 		// one observation is not enough to ship a threshold on; a wrong cutoff

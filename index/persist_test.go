@@ -112,7 +112,7 @@ func TestReplayOverTheBaseWins(t *testing.T) {
 		t.Fatalf("hydrate: %v", err)
 	}
 	if len(got) != 1 {
-		t.Fatalf("hydrated %d entries, want 1 — a rewritten record was duplicated", len(got))
+		t.Fatalf("hydrated %d entries, want 1, a rewritten record was duplicated", len(got))
 	}
 	if got[0].Vector[0] != 9 {
 		t.Fatalf("hydrated the base's value %v, want the delta's", got[0].Vector[0])

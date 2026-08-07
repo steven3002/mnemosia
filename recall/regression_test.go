@@ -21,7 +21,7 @@ import (
 )
 
 // This is the one package that measures the embedding model, so it is one of
-// only two that load it — the numbers here are properties of that model and a
+// only two that load it, the numbers here are properties of that model and a
 // stub would not be measuring anything. The harness never downloads it: an
 // ordinary `go test ./...` has to touch no network, so a machine without the
 // model gets a skip and a green run.
@@ -36,7 +36,7 @@ type harness struct {
 	pipeline *recall.Pipeline
 	byHandle map[string]fixtureRecord
 	// density is how many non-gold records compete with a typical correct
-	// answer to each query — the axis that exposes what an aggregate hides.
+	// answer to each query, the axis that exposes what an aggregate hides.
 	density map[string]int
 	// embedFor is what embedding the whole corpus cost, which is the figure
 	// recovery is bounded by.
@@ -351,7 +351,7 @@ func filterOf(q fixtureQuery) recall.Filter {
 //
 // It reports two axes rather than one aggregate, because one is not enough.
 // Per-query near-neighbour density is what exposes the unevenness an aggregate
-// conceals — the crowded half of a vault scores far below the sparse half — and
+// conceals, the crowded half of a vault scores far below the sparse half, and
 // vault shape is what density does not account for, since a same-subject
 // neighbour carries the answer's own tags and the filter cannot separate them
 // while a neighbour from elsewhere at the same similarity is removed.
@@ -667,7 +667,7 @@ func TestFilterWeightSweep(t *testing.T) {
 // BM25 and is actively harmed by it, because BM25 still ranks something and
 // fusion still promotes what it ranks. Those queries are a minority of any
 // labelled set, so a weight tuned on the aggregate degrades them while the
-// average improves — which is the one outcome a memory store cannot accept,
+// average improves, which is the one outcome a memory store cannot accept,
 // since retrieving a record that shares no words with the question is the thing
 // it exists to do.
 //
@@ -786,7 +786,7 @@ func filterOutcomes(outcomes []outcome, keep func(outcome) bool) []outcome {
 
 // The floor soft filtering exists to provide: however wrong the filter, the
 // ranking cannot fall below what no filter at all would have produced. Hard
-// filtering has no such floor — one wrong tag measured 0.949 down to 0.729,
+// filtering has no such floor, one wrong tag measured 0.949 down to 0.729,
 // below the unfiltered baseline, with a sixth of queries returning nothing.
 func TestSoftFilteringHasAFloor(t *testing.T) {
 	h := newHarness(t)

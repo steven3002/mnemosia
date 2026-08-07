@@ -23,7 +23,7 @@ const (
 // A Log is the catalog's durable form: a snapshot plus an append-only tail.
 //
 // Rewriting a whole catalog on every write costs time quadratic in the record
-// count, and the bytes it churns are charged for — at a hundred thousand
+// count, and the bytes it churns are charged for, at a hundred thousand
 // records that is the difference between rewriting gigabytes and rewriting tens
 // of megabytes. Appending a delta per flush and folding it into a snapshot
 // occasionally is what keeps the catalog's cost proportional to what changed.

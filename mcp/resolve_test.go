@@ -62,7 +62,7 @@ func TestParseRejectsMalformedAddresses(t *testing.T) {
 // named in the instructions.
 //
 // A host fetches resources/list at connect and keeps it to itself, so
-// registering an address does not make it reachable — the model never sees the
+// registering an address does not make it reachable, the model never sees the
 // listing, and it will correctly refuse to guess a URI it was never told about.
 // The failure is silent, which is why it is asserted here.
 func TestEveryAddressableFormIsNamedInTheInstructions(t *testing.T) {

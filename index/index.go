@@ -45,7 +45,7 @@ func (i *Index) Len() int {
 // ErrForeignModel reports a vector produced by a model other than this index's.
 //
 // Two models embed into different spaces, so the cosine between their vectors is
-// a number with no meaning — and, being a number, it ranks perfectly happily.
+// a number with no meaning, and, being a number, it ranks perfectly happily.
 // That is the failure this guards: not a crash, but a silently wrong order.
 var ErrForeignModel = errors.New("vector was produced by a different embedding model")
 

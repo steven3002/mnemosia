@@ -61,7 +61,7 @@ func serveOverStdio(home string) {
 //
 // Raw rather than through the SDK client on purpose: the SDK negotiates the
 // newest revision it knows, and the whole question here is what happens when a
-// client that only speaks an older one connects — which is every client actually
+// client that only speaks an older one connects, which is every client actually
 // shipping.
 type client struct {
 	t    *testing.T
@@ -218,7 +218,7 @@ func (c *client) callTool(name string, args any) map[string]any {
 // 2025-11-25, and nothing on this surface depends on a 2026-07-28 mechanism.
 //
 // This is not a hypothetical. The published revision is 2026-07-28 and every
-// real client measured speaks 2025-11-25 — the TypeScript SDK, the official
+// real client measured speaks 2025-11-25, the TypeScript SDK, the official
 // Inspector, and the production chat host all sit a revision behind, and Claude
 // Desktop, Cursor and VS Code are all built on that SDK. A surface that needed
 // the newer revision would be a demo that does not run.
@@ -291,7 +291,7 @@ func TestTheServerWorksWhenNegotiatedDownToTheRevisionRealClientsSpeak(t *testin
 const currentVersion = "2026-07-28"
 
 // The server serves the current revision too, but only on the path that
-// revision defines — and an `initialize` handshake can never reach it.
+// revision defines, and an `initialize` handshake can never reach it.
 //
 // ⚠ This is sharper than "real clients lag", and it was found by probing rather
 // than assumed. `initialize` is deprecated in 2026-07-28, so go-sdk v1.7.0 caps
@@ -302,7 +302,7 @@ const currentVersion = "2026-07-28"
 //
 // The consequence for this project is the useful part. Every shipping client
 // uses `initialize`, so they are on 2025-11-25 **by construction and not merely
-// by lag** — pass mark 5 is not a happy accident about version strings, it is
+// by lag**, pass mark 5 is not a happy accident about version strings, it is
 // the only path those clients have.
 func TestTheCurrentRevisionIsReachableOnlyOnItsOwnStatelessPath(t *testing.T) {
 	server := spawn(t, t.TempDir())

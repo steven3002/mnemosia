@@ -22,8 +22,8 @@ import (
 // withLinks builds a tool result's content: the mirrored text, then a resource
 // link per record.
 //
-// Links rather than bare ids, everywhere. An id is a dead end — the model has to
-// know which subsystem owns it and how to assemble an address — where a link is
+// Links rather than bare ids, everywhere. An id is a dead end, the model has to
+// know which subsystem owns it and how to assemble an address, where a link is
 // something it can hand straight back to `open`.
 func withLinks(text string, hits []HitOut) []sdk.Content {
 	content := make([]sdk.Content, 0, len(hits)+1)
@@ -160,7 +160,7 @@ func renderRemember(out RememberOut) string {
 			case tag.New:
 				fmt.Fprintf(&text, "  %-24s new to this vault\n", tag.Tag)
 			case tag.TooCommon:
-				fmt.Fprintf(&text, "  %-24s %d record(s), %.0f%% of the vault — too common to narrow anything\n",
+				fmt.Fprintf(&text, "  %-24s %d record(s), %.0f%% of the vault, too common to narrow anything\n",
 					tag.Tag, tag.Records, 100*tag.Share)
 			default:
 				fmt.Fprintf(&text, "  %-24s %d record(s), %.0f%%\n", tag.Tag, tag.Records, 100*tag.Share)
@@ -218,7 +218,7 @@ func orElse(value, fallback string) string {
 // it belongs to.
 //
 // The stamp is what makes it safe. A ranking has no key order to page along, so
-// the position has to be an offset — and an offset carried across a different
+// the position has to be an offset, and an offset carried across a different
 // query would silently skip that query's best results while looking like it
 // worked. Refusing it is a wrong argument the caller can see; honouring it is a
 // wrong answer the caller cannot.

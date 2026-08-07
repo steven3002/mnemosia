@@ -2,8 +2,8 @@
 //
 // It offers two things, and which one a test wants follows from what the test
 // is measuring. A test of ranking *quality* needs the real model, because the
-// numbers are properties of that model. Everything else — storage, versioning,
-// supersession, chunking, listing, links — needs vectors that behave sensibly
+// numbers are properties of that model. Everything else, storage, versioning,
+// supersession, chunking, listing, links, needs vectors that behave sensibly
 // and does not care where they came from; those tests take the stub, which
 // costs nothing to load.
 //
@@ -55,7 +55,7 @@ var ErrNoModel = errors.New("embedding model is not present")
 // The lock is what makes a parallel `go test ./...` survive on a small machine.
 // Two test binaries each holding the model need more memory than the machine
 // this was written on has free, and the failure mode is the kernel killing one
-// of them — which reads as a flaky test rather than as what it is. Serialising
+// of them, which reads as a flaky test rather than as what it is. Serialising
 // only the packages that genuinely need the model leaves every other package
 // running in parallel, which is where the wall-clock time actually is.
 //
@@ -124,7 +124,7 @@ func acquireModelSlot() (func(), error) {
 //
 // The name is deliberately not a real model's. It is stored beside every vector
 // the stub produces, so a vault built with the stub and then opened with the
-// real model reports its vectors as foreign and refuses to rank them — which is
+// real model reports its vectors as foreign and refuses to rank them, which is
 // the behaviour that exists to catch a half-re-embedded index, working exactly
 // as it should.
 var StubModel = embed.Model{Name: "stub-hashed-bag-of-words", Dim: 128}
@@ -133,7 +133,7 @@ var StubModel = embed.Model{Name: "stub-hashed-bag-of-words", Dim: 128}
 //
 // It is a hashed bag of words: each term is hashed to a dimension, the counts
 // are L2-normalised, and cosine similarity is therefore term overlap. That is
-// not semantic similarity and is not meant to be — it is enough for a test to
+// not semantic similarity and is not meant to be, it is enough for a test to
 // assert that a record is found by its own words, that an identical statement
 // is recognised as a restatement, and that a vault's vectors survive a restart.
 // Anything measuring how well *meaning* is retrieved must use the real model.

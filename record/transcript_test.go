@@ -443,8 +443,8 @@ func toPart(stored map[string]json.RawMessage, counts *census) (record.Part, err
 
 	mapping, known := partMapping[kind]
 	// consumed starts as the mapping's own answer and is narrowed by the cases
-	// below, so a field the schema models only conditionally — one whose absent
-	// and default spellings the schema cannot tell apart — falls back to the
+	// below, so a field the schema models only conditionally, one whose absent
+	// and default spellings the schema cannot tell apart, falls back to the
 	// passthrough bag instead of being silently normalised.
 	consumed := make(map[string]bool, len(mapping.mapped))
 	for key := range mapping.mapped {
@@ -472,7 +472,7 @@ func toPart(stored map[string]json.RawMessage, counts *census) (record.Part, err
 		// spelling of its absence: written out again, an explicit false and an
 		// omitted key are the same key. The fact is what the schema models, and
 		// the spelling rides in the passthrough bag with everything else it does
-		// not — which is why only a true value is treated as mapped.
+		// not, which is why only a true value is treated as mapped.
 		if raw, ok := stored["is_error"]; !ok || string(raw) != "true" {
 			delete(consumed, "is_error")
 		} else {
