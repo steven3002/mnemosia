@@ -243,6 +243,11 @@ write fails. Reclamation is two-phase and refuses to run on a keep-set that does
 everything the vault holds, an empty keep-set means the computation is wrong, not that the data is
 dead.
 
+**This is also the only thing that costs money.** Reclaimed, the free tier holds around **57 million
+records**; written one record per object it holds **1,250**. Beyond the free tier, storing 100,000
+memories for a year is about a third of a cent. The arithmetic, both price sources, and a plain
+statement of what has and has not actually been paid for are in [`docs/cost.md`](docs/cost.md).
+
 ---
 
 ## Status
@@ -258,20 +263,24 @@ dead.
   **while a second process is writing to the same vault**
 - An interrupted repack loses no data
 - Three-tier reads, from the device's own copy through a cached location to a cold fetch
-- Sessions saved on one machine and resumed on another
+- A conversation saved on one machine and replayed **byte for byte** on another
 - An MCP server two different clients, on two different protocol revisions, drive at once
 
 **Not yet built:** the `skill` record type, the local viewer, session forking.
 
 **Stated plainly, because it would be easy to imply otherwise:**
 
-- **A resumed session is not the session.** A session head rebuilt from its stored chunks recovers
-  the transcript byte for byte, but **11 of its 26 fields** come back; the summary, tags, project and
-  lineage do not.
+- **A conversation comes back exactly. The label on it does not.** Replayed on a second machine, every
+  message is byte for byte what was saved, including each tool call and the result it was correlated
+  with. What is *not* on Sia is the head that described the conversation, so of its 26 fields **11 are
+  restored, 3 are reconstructed from the transcript itself, and 12 are gone** — the summary, tags,
+  project and lineage among them. **The vault reports the origin of every field it returns**, rather
+  than handing back a rebuilt head as though it were the original.
 - **Opening a vault on a second machine needs the phrase *and* one browser approval.** The phrase
   alone is not sufficient, and we do not claim seed-only recovery.
 - **Cost figures we quote are advertised rates, not invoices.** The free tier has covered everything
-  so far; we have never paid a bill.
+  so far; we have never paid a bill. The arithmetic, its sources and its limits are in
+  [`docs/cost.md`](docs/cost.md).
 - **Recall quality numbers come from synthetic corpora**, not from a real personal vault.
 
 ## Troubleshooting
