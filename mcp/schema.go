@@ -28,6 +28,7 @@ var schemaJSON []byte
 // construct one, and the correlation id, the single field no later reader can
 // reconstruct, is stated twice, once on each half of the exchange.
 //
-// A test asserts that every field of record.Message and record.Part appears
-// there, so the schema cannot fall behind the type it describes.
+// Nothing checks it against the types it describes. record.Message and
+// record.Part are tracked here by hand, so a field added to either is a field
+// this schema quietly stops naming.
 var SaveSessionSchema = json.RawMessage(bytes.TrimSpace(schemaJSON))
