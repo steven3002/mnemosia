@@ -88,8 +88,12 @@ func (f *vaultFlags) open(ctx context.Context) (*vault.Vault, error) {
 // still the only notice that the next run may have something to recover: a
 // record queued but not flushed stays claimed, and the device store was left to
 // the operating system rather than closed.
+//
+// It is a warning rather than an error line because a defer runs before the
+// command's own failure is reported, and two "mnemosia:" lines in that order
+// would make this one look like the reason the command failed.
 func closing(v *vault.Vault) {
 	if err := v.Close(); err != nil {
-		fmt.Fprintf(os.Stderr, "mnemosia: close: %v\n", err)
+		fmt.Fprintf(os.Stderr, "warning: the vault did not close cleanly: %v\n", err)
 	}
 }

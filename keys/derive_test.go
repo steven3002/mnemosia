@@ -88,7 +88,9 @@ func TestAppKeyComesFromTheEnvironment(t *testing.T) {
 		t.Fatalf("an unset app key reported %v", err)
 	}
 
-	t.Setenv(keys.AppKeyEnv, "  deadbeef01020304  ")
+	// A whole key's worth of bytes, because a shorter one is now refused as
+	// damaged rather than read; the leading bytes are what the fingerprint reads.
+	t.Setenv(keys.AppKeyEnv, "  deadbeef"+strings.Repeat("01", 60)+"  ")
 	key, err := keys.AppKeyFromEnv()
 	if err != nil {
 		t.Fatalf("app key: %v", err)

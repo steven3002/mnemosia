@@ -61,8 +61,11 @@ func Connect(cfg Config) (*Client, error) {
 	if indexer == "" {
 		indexer = DefaultIndexer
 	}
-	if len(cfg.AppKey) == 0 {
-		return nil, keys.ErrNoAppKey
+	// Checked here as well as where the key is read, because the conversion
+	// below is unchecked by construction: types.PrivateKey is a byte slice, and
+	// a wrong-sized one panics when it signs rather than returning an error.
+	if err := cfg.AppKey.Check(); err != nil {
+		return nil, err
 	}
 	appKey := types.PrivateKey(cfg.AppKey)
 

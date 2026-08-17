@@ -121,6 +121,12 @@ func explain(err error) {
 			"  approved this installation with your indexer. In a host's MCP config that is\n"+
 			"  the server's \"env\" block. It is a secret: never pass it as an argument.\n",
 			keys.AppKeyEnv)
+	case keys.WrongAppKeyLength(err):
+		fmt.Fprintf(os.Stderr, ""+
+			"  The key in %s reached this server damaged, most likely\n"+
+			"  truncated by the copy or the secret store it came through. Set it to the\n"+
+			"  whole value approval issued, or run mnemosia connect again for a new one.\n",
+			keys.AppKeyEnv)
 	case errors.Is(err, keys.ErrNoPhrase):
 		fmt.Fprintf(os.Stderr, ""+
 			"  Set %s in this server's environment. The vault derives its keys from it\n"+

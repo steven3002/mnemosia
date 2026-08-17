@@ -17,7 +17,10 @@ import (
 // Not parallel: it sets the environment variable a later run would load from,
 // which is the half of the round trip that matters.
 func TestTheAppKeyWrittenIsTheAppKeyReadBack(t *testing.T) {
-	key := keys.AppKey{0xde, 0xad, 0xbe, 0xef, 0x01, 0x02, 0x03, 0x04}
+	// A whole key's worth of bytes: a shorter one no longer loads, because a
+	// key that is not an ed25519 private key panics when it signs.
+	key := make(keys.AppKey, 64)
+	copy(key, []byte{0xde, 0xad, 0xbe, 0xef, 0x01, 0x02, 0x03, 0x04})
 	path := filepath.Join(t.TempDir(), "mnemosia.key")
 
 	if err := writeAppKey(path, key); err != nil {

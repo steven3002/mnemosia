@@ -71,6 +71,12 @@ func report(err error) {
 			"    mnemosia connect -out mnemosia.key\n\n"+
 			"  To work without an indexer, pass -offline before the arguments:\n"+
 			"    mnemosia remember -offline -context \"...\" \"...\"\n", keys.AppKeyEnv)
+	case keys.WrongAppKeyLength(err):
+		fmt.Fprintf(os.Stderr, "mnemosia: %v.\n\n"+
+			"  The key in %s arrived damaged, most likely truncated\n"+
+			"  by the copy or the secret store it came through. Set it to the whole\n"+
+			"  value that approval issued, or issue a new one:\n"+
+			"    mnemosia connect -out mnemosia.key\n", err, keys.AppKeyEnv)
 	case errors.Is(err, keys.ErrNoPhrase):
 		fmt.Fprintf(os.Stderr, "mnemosia: no recovery phrase.\n\n"+
 			"  Set %s, or pipe the phrase in on stdin. The vault derives its\n"+

@@ -143,6 +143,13 @@ Everything below has been exercised against the live Sia network unless it says 
   same form the server uses. It deliberately does not change the exit code: by the time it runs the
   command's work is done and its result decided, and a close failure is information about the *next*
   run, not a reason to call this one failed.
+- **A damaged app key is refused with a sentence instead of a stack trace.** An app key is an
+  ed25519 private key, and `types.PrivateKey` is a byte slice whose length the compiler cannot
+  enforce, so anything but 64 bytes panicked when it went to sign,measured at 4 and 31 bytes on a
+  slice bound, at 32 and 63 inside `crypto/ed25519`. Only "non-empty hex" was ever checked. The
+  length is now checked where the key is read *and* on the line above the conversion, so no caller
+  can reach the panic, and a truncated key,the likely way this happens, a copy that dropped
+  characters,gets its own instruction rather than the one for a key that was never set.
 - **An already-released slab no longer fails a reclamation.** The code intended to treat a slab the
   indexer had released on its own as success, and the check never matched: the sentinel is
   `slab not found`, and the service sends `slab <id> not found`, with the id in the middle. The
