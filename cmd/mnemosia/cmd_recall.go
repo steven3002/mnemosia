@@ -35,7 +35,7 @@ func runRecall(ctx context.Context, args []string) error {
 	if err != nil {
 		return err
 	}
-	defer v.Close()
+	defer closing(v)
 
 	result, err := v.Recall(ctx, recall.Request{
 		Query:             query,

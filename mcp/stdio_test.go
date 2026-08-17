@@ -34,27 +34,28 @@ const serverModeEnv = "MNEMOSIA_TEST_SERVE_HOME"
 
 func TestMain(m *testing.M) {
 	if home := os.Getenv(serverModeEnv); home != "" {
-		serveOverStdio(home)
-		return
+		os.Exit(serveOverStdio(home))
 	}
 	os.Exit(m.Run())
 }
 
-// serveOverStdio runs the MCP server over this process's stdin and stdout.
+// serveOverStdio runs the MCP server over this process's stdin and stdout and
+// reports the status to exit with.
 //
 // Nothing but protocol traffic reaches stdout, which is the contract stdio
 // imposes and the one a stray print breaks silently.
-func serveOverStdio(home string) {
+func serveOverStdio(home string) int {
 	v, err := vaultForServing(home)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "serve: %v\n", err)
-		os.Exit(1)
+		return 1
 	}
 	defer v.Close()
 	if err := mcp.New(v).Run(context.Background(), &sdk.StdioTransport{}); err != nil {
 		fmt.Fprintf(os.Stderr, "serve: %v\n", err)
-		os.Exit(1)
+		return 1
 	}
+	return 0
 }
 
 // A client is one server subprocess spoken to in raw JSON-RPC.

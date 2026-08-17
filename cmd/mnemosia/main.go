@@ -11,13 +11,15 @@ import (
 	"github.com/steven3002/mnemosia/keys"
 )
 
-func main() {
+func main() { os.Exit(run()) }
+
+func run() int {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
 
 	if len(os.Args) < 2 {
 		usage()
-		os.Exit(2)
+		return 2
 	}
 
 	var err error
@@ -42,17 +44,18 @@ func main() {
 		err = runHydrate(ctx, os.Args[2:])
 	case "help", "-h", "--help":
 		usage()
-		return
+		return 0
 	default:
 		fmt.Fprintf(os.Stderr, "mnemosia: unknown command %q\n\n", os.Args[1])
 		usage()
-		os.Exit(2)
+		return 2
 	}
 
 	if err != nil {
 		report(err)
-		os.Exit(1)
+		return 1
 	}
+	return 0
 }
 
 // report explains the two failures a first run actually hits, rather than

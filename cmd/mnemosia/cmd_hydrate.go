@@ -34,7 +34,7 @@ func runHydrate(ctx context.Context, args []string) error {
 	if err != nil {
 		return err
 	}
-	defer v.Close()
+	defer closing(v)
 
 	fmt.Fprintf(stderr, "hydrating from %s to depth %q\n", v.Indexer(), *depth)
 	tick := time.Now()

@@ -21,7 +21,14 @@ import (
 	"github.com/steven3002/mnemosia/vault"
 )
 
-func main() {
+func main() { os.Exit(run()) }
+
+// run returns the exit status rather than taking it, so that the vault is closed
+// on the way out however this ends. A transport that fails is the ordinary way a
+// host ends this process, and a flush in flight when it does holds a claim on the
+// records it is writing: waiting for it hands them back, abandoning it leaves them
+// claimed until the claim expires.
+func run() int {
 	// SIGTERM as well as interrupt: a host that restarts its servers terminates
 	// them, and a queued record that never reached a flush should be released by
 	// a clean shutdown rather than left claimed until it expires.
@@ -30,7 +37,7 @@ func main() {
 
 	if len(os.Args) > 1 {
 		usage()
-		os.Exit(2)
+		return 2
 	}
 
 	server, closeVault := serve(ctx)
@@ -38,8 +45,9 @@ func main() {
 
 	if err := server.Run(ctx, &sdk.StdioTransport{}); err != nil && !errors.Is(err, context.Canceled) {
 		fmt.Fprintf(os.Stderr, "mnemosia-mcp: %v\n", err)
-		os.Exit(1)
+		return 1
 	}
+	return 0
 }
 
 // serve opens the vault, or explains why it could not and serves anyway.
@@ -67,7 +75,14 @@ func serve(ctx context.Context) (*mcp.Server, func()) {
 		fmt.Fprintf(os.Stderr, "mnemosia-mcp: background flush: %v\n", err)
 	})
 	fmt.Fprintf(os.Stderr, "mnemosia-mcp: serving %s over stdio\n", describe(opened))
-	return mcp.New(opened), func() { opened.Close() }
+	return mcp.New(opened), func() {
+		// The process is on its way out, so this changes no exit code. It is
+		// still the only notice that a vault did not shut down cleanly, which is
+		// what someone is looking for when the next run has to recover from it.
+		if err := opened.Close(); err != nil {
+			fmt.Fprintf(os.Stderr, "mnemosia-mcp: close: %v\n", err)
+		}
+	}
 }
 
 func open(ctx context.Context) (*vault.Vault, error) {

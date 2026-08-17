@@ -27,7 +27,7 @@ func runFlush(ctx context.Context, args []string) error {
 	if err != nil {
 		return err
 	}
-	defer v.Close()
+	defer closing(v)
 
 	pending := v.Pending()
 	if pending == 0 {
@@ -69,7 +69,7 @@ func runStatus(ctx context.Context, args []string) error {
 	if err != nil {
 		return err
 	}
-	defer v.Close()
+	defer closing(v)
 
 	entries := v.Entries()
 	fmt.Fprintf(stderr, "records   %d catalogued, %d queued for Sia\n", len(entries), v.Pending())
@@ -206,7 +206,7 @@ func runReclaim(ctx context.Context, args []string) error {
 	if err != nil {
 		return err
 	}
-	defer v.Close()
+	defer closing(v)
 
 	opts := vault.ReclaimOptions{ReleaseAll: *releaseAll, TakeOwnership: *takeOwnership}
 
@@ -329,7 +329,7 @@ func runRecover(ctx context.Context, args []string) error {
 	if err != nil {
 		return err
 	}
-	defer v.Close()
+	defer closing(v)
 
 	fmt.Fprint(stderr, "rebuilding from the recovery phrase and the indexer\n")
 	report, err := v.Recover(ctx, vault.RecoveryRequest{

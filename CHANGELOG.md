@@ -127,6 +127,22 @@ Everything below has been exercised against the live Sia network unless it says 
 
 ### Fixed
 
+- **The MCP server no longer exits without closing the vault.** Any transport error left the process
+  through `os.Exit`, which runs no deferred function, so the close that stops the flush timer and
+  releases the manifest, the search index, the embedder, the indexer connection, the sealer and the
+  device store never happened. A flush in flight at that moment holds a claim on the records it is
+  writing so that two installations cannot pay for the same slab twice, and abandoning it left them
+  claimed until the claim expired rather than handing them back. The close's own error was discarded
+  as well, and now reaches stderr like every other diagnostic here, without changing the exit code:
+  a vault that did not shut down cleanly is exactly what the next run has to recover from, and it
+  used to say nothing at all. `go vet` has no check for this, which is how it survived a green
+  pipeline, so CI now runs one.
+- **The command line says when a vault did not shut down cleanly.** All eight subcommands that open
+  a vault closed it through a deferred `Close()` whose error went nowhere, so a device store that
+  failed to finalize still reported success and exited 0. The close now reports to stderr in the
+  same form the server uses. It deliberately does not change the exit code: by the time it runs the
+  command's work is done and its result decided, and a close failure is information about the *next*
+  run, not a reason to call this one failed.
 - **An already-released slab no longer fails a reclamation.** The code intended to treat a slab the
   indexer had released on its own as success, and the check never matched: the sentinel is
   `slab not found`, and the service sends `slab <id> not found`, with the id in the middle. The

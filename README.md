@@ -273,7 +273,7 @@ statement of what has and has not actually been paid for are in [`docs/cost.md`]
 - **A conversation comes back exactly. The label on it does not.** Replayed on a second machine, every
   message is byte for byte what was saved, including each tool call and the result it was correlated
   with. What is *not* on Sia is the head that described the conversation, so of its 26 fields **11 are
-  restored, 3 are reconstructed from the transcript itself, and 12 are gone** — the summary, tags,
+  restored, 3 are reconstructed from the transcript itself, and 12 are gone**,the summary, tags,
   project and lineage among them. **The vault reports the origin of every field it returns**, rather
   than handing back a rebuilt head as though it were the original.
 - **Opening a vault on a second machine needs the phrase *and* one browser approval.** The phrase

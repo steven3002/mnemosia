@@ -44,7 +44,7 @@ func runRemember(ctx context.Context, args []string) error {
 	if err != nil {
 		return err
 	}
-	defer v.Close()
+	defer closing(v)
 
 	req := vault.RememberRequest{
 		Statement: statement,

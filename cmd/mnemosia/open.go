@@ -80,3 +80,16 @@ func (f *vaultFlags) open(ctx context.Context) (*vault.Vault, error) {
 	}
 	return v, nil
 }
+
+// closing releases the vault and says so when the shutdown did not complete.
+//
+// The command's result is already decided by the time this runs and a close
+// failure does not undo work that succeeded, so it changes no exit code. It is
+// still the only notice that the next run may have something to recover: a
+// record queued but not flushed stays claimed, and the device store was left to
+// the operating system rather than closed.
+func closing(v *vault.Vault) {
+	if err := v.Close(); err != nil {
+		fmt.Fprintf(os.Stderr, "mnemosia: close: %v\n", err)
+	}
+}

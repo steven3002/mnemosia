@@ -35,7 +35,7 @@ func runInit(ctx context.Context, args []string) error {
 	if err != nil {
 		return err
 	}
-	defer v.Close()
+	defer closing(v)
 	fmt.Fprintf(stderr, "  keys derived, model loaded, device store ready in %s\n", took(time.Since(start)))
 
 	if !v.Online() {

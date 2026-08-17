@@ -34,6 +34,13 @@ jobs:
       - name: vet
         run: go vet ./...
 
+      # vet has no check for this and the MCP server shipped with it: an os.Exit
+      # on an error path skipped the deferred close, so a record claimed for a
+      # flush stayed claimed until the claim expired. Pinned, and narrowed to the
+      # one class, so an upgrade cannot fail the build on a new style opinion.
+      - name: exit after defer
+        run: go run github.com/go-critic/go-critic/cmd/gocritic@v0.14.4 check -enable=exitAfterDefer ./...
+
       - name: gofmt
         run: |
           unformatted="$(gofmt -l . | grep -v '^\.models/' || true)"
