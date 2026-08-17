@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	// Registers the "sqlite" driver Open asks for; pure Go, so no cgo.
 	_ "modernc.org/sqlite"
 )
 

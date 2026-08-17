@@ -1,3 +1,8 @@
+// Package record defines the stored form of everything a vault holds.
+//
+// A record is immutable once written, so the schema evolves by addition alone:
+// a reader tolerates fields it does not recognise rather than refusing the
+// record that carries them.
 package record
 
 // A Kind is the class of record stored on the substrate. Kinds share one

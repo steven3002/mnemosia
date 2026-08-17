@@ -1,6 +1,13 @@
 package mcp
 
-import "encoding/json"
+import (
+	"bytes"
+	_ "embed"
+	"encoding/json"
+)
+
+//go:embed schema.json
+var schemaJSON []byte
 
 // SaveSessionSchema is the input schema for save_session, written by hand.
 //
@@ -17,172 +24,10 @@ import "encoding/json"
 // The second is that inference would produce an undocumented schema. Property
 // descriptions come from struct tags, and the record package's types carry none:
 // they describe how a message is stored, not how an agent should fill one in.
-// Every property below is documented for the agent that has to construct one,
-// and the correlation id, the single field no later reader can reconstruct, is
-// stated twice, once on each half of the exchange.
+// Every property in schema.json is documented for the agent that has to
+// construct one, and the correlation id, the single field no later reader can
+// reconstruct, is stated twice, once on each half of the exchange.
 //
 // A test asserts that every field of record.Message and record.Part appears
-// here, so the schema cannot fall behind the type it describes.
-var SaveSessionSchema = json.RawMessage(`{
-  "type": "object",
-  "additionalProperties": false,
-  "properties": {
-    "session": {
-      "type": "string",
-      "description": "The address of a conversation to append to, as mnemosia://session/{id}. Omit to create a new one."
-    },
-    "title": {
-      "type": "string",
-      "description": "One specific line naming the conversation. Required when creating; on an append, supply it only to change it."
-    },
-    "summary": {
-      "type": "string",
-      "description": "What was decided, tried and left open. THE TRANSCRIPT IS NOT SEARCHABLE: this, the title and the tags are the entire searchable surface of a conversation. Write it for someone deciding whether to open the conversation."
-    },
-    "tags": {
-      "type": "array",
-      "items": {"type": "string"},
-      "description": "Two to four specific tags, reused from the vault's existing vocabulary where they fit. Read mnemosia://vault for it."
-    },
-    "messages": {
-      "type": "array",
-      "items": {"$ref": "#/$defs/message"},
-      "description": "The turns to store, in order. On an append, only the new ones."
-    },
-    "project": {
-      "type": "object",
-      "additionalProperties": false,
-      "description": "Where the conversation happened.",
-      "properties": {
-        "cwd": {"type": "string", "description": "The working directory."},
-        "repo": {"type": "string", "description": "The repository."},
-        "branch": {"type": "string", "description": "The branch."}
-      }
-    },
-    "agent": {
-      "type": "object",
-      "additionalProperties": false,
-      "description": "The client writing this conversation.",
-      "properties": {
-        "name": {"type": "string", "description": "The client's name, for example claude-code."},
-        "version": {"type": "string", "description": "Its version."}
-      }
-    },
-    "models": {
-      "type": "array",
-      "items": {"type": "string"},
-      "description": "The models that spoke in the conversation."
-    },
-    "preservedTail": {
-      "type": "array",
-      "items": {"type": "string"},
-      "description": "Message ids worth keeping verbatim beside the summary. An accelerator, never a replacement for the transcript."
-    },
-    "durable": {
-      "type": "boolean",
-      "description": "Write to the network before returning instead of on the ordinary schedule. Use at the end of a long conversation, not on every append: each forced write costs a whole storage block whatever it holds."
-    },
-    "archived": {
-      "type": "boolean",
-      "description": "Put the conversation away, so it stops appearing in ordinary listings."
-    }
-  },
-  "$defs": {
-    "message": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["id", "role", "parts"],
-      "properties": {
-        "id": {
-          "type": "string",
-          "description": "Stable and unique within this conversation. It is what a preserved tail, a fork point and a memory's provenance all point at."
-        },
-        "role": {
-          "type": "string",
-          "enum": ["user", "assistant", "system", "tool"],
-          "description": "Who produced the turn. Use tool for a turn that is only a tool result, if your runtime models it that way; otherwise put the result part in the user turn that carried it."
-        },
-        "parts": {
-          "type": "array",
-          "items": {"$ref": "#/$defs/part"},
-          "description": "The content, in order. Never a flat string: a string cannot hold a tool call, a thinking block or an image, so a conversation stored that way degrades into a chat log."
-        },
-        "created": {"type": "string", "description": "When the turn happened, RFC 3339. For display; order comes from the sequence, never from the clock."},
-        "parent": {"type": "string", "description": "The id of the turn this one replies to, so a conversation that branched keeps its shape."},
-        "meta": {
-          "type": "object",
-          "additionalProperties": false,
-          "description": "What the runtime knew about the turn.",
-          "properties": {
-            "model": {"type": "string", "description": "Which model produced it."},
-            "stopReason": {"type": "string", "description": "Why generation stopped."},
-            "agent": {"type": "string", "description": "Which agent produced it, when several were involved."},
-            "skill": {"type": "string", "description": "The skill this turn is attributable to, if any."},
-            "memoryRefs": {
-              "type": "array",
-              "items": {"type": "string"},
-              "description": "Ids of the memories that were in context for this turn. A transcript replayed without them reproduces the words and not the conditions."
-            },
-            "usage": {
-              "type": "object",
-              "additionalProperties": false,
-              "description": "What the turn cost.",
-              "properties": {
-                "inputTokens": {"type": "integer"},
-                "outputTokens": {"type": "integer"},
-                "cacheReadTokens": {"type": "integer"},
-                "cacheWriteTokens": {"type": "integer"},
-                "reasoningTokens": {"type": "integer"}
-              }
-            }
-          }
-        },
-        "ext": {
-          "type": "object",
-          "description": "Your runtime's own fields for this turn, carried through untouched and returned exactly as given. Put anything here that this schema does not name rather than dropping it.",
-          "additionalProperties": true
-        }
-      }
-    },
-    "part": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["type"],
-      "properties": {
-        "type": {
-          "type": "string",
-          "description": "text, reasoning, toolCall, toolResult, file or resourceLink. A type this vault does not know is stored rather than refused, so a part your runtime has that this list does not is still safe to send under its own name.",
-          "examples": ["text", "reasoning", "toolCall", "toolResult", "file", "resourceLink"]
-        },
-        "text": {"type": "string", "description": "The prose, for a text part, or the thinking, for a reasoning part."},
-        "signature": {"type": "string", "description": "The opaque attestation attached to a reasoning block, which must survive for the block to be replayable."},
-        "callId": {
-          "type": "string",
-          "description": "REQUIRED on both a toolCall and the toolResult it produced, and the SAME value on each. It is the only thing that correlates them, no later reader can reconstruct it, and a call without one is refused rather than stored broken."
-        },
-        "name": {"type": "string", "description": "The tool that was called."},
-        "input": {"description": "The arguments it was called with, as they were sent."},
-        "content": {
-          "type": "array",
-          "items": {"$ref": "#/$defs/part"},
-          "description": "A tool result's own parts, so a tool that returned an image is stored as one. A result that was a plain string is one text part."
-        },
-        "isError": {"type": "boolean", "description": "True when the tool reported a failure."},
-        "mediaType": {"type": "string", "description": "The media type of an attachment."},
-        "ref": {
-          "type": "string",
-          "description": "Where an attachment's bytes are held. Hold them by reference: inline base64 is the largest single cause of transcript bloat, and a session record that inlines it stops being small enough to be worth having."
-        },
-        "filename": {"type": "string", "description": "The attachment's file name."},
-        "bytes": {"type": "integer", "description": "The attachment's size."},
-        "sha256": {"type": "string", "description": "The attachment's digest."},
-        "uri": {"type": "string", "description": "The address another record is at, for a resourceLink part."},
-        "ext": {
-          "type": "object",
-          "description": "Your runtime's own fields for this part, carried through untouched.",
-          "additionalProperties": true
-        }
-      }
-    }
-  }
-}`)
+// there, so the schema cannot fall behind the type it describes.
+var SaveSessionSchema = json.RawMessage(bytes.TrimSpace(schemaJSON))

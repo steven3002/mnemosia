@@ -1,3 +1,5 @@
+// Package keys derives a vault's keys from its recovery phrase and reads the
+// Sia app key from the environment.
 package keys
 
 import (
